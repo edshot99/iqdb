@@ -7,8 +7,8 @@ CFLAGS=-Wall -O2 -DNDEBUG -std=c++98 -Wno-c++11-compat
 EXTRADEFS=
 
 # Graphics library to use, can be GD or ImageMagick.
-IMG_LIB=GD
-#IMG_LIB=ImageMagick
+#IMG_LIB=GD
+IMG_LIB=ImageMagick
 
 # In simple mode, by default all data needed for queries is now
 # read into memory, using in total about 500 bytes per image. It
@@ -60,8 +60,8 @@ haar.le.o :
 .ALWAYS:
 
 ifeq (${IMG_LIB},GD)
-IMG_libs = -lgd $(shell gdlib-config --ldflags; gdlib-config --libs)
-IMG_flags = $(shell gdlib-config --cflags)
+IMG_libs = $(shell pkg-config --libs gdlib libpng12 libjpeg)
+IMG_flags = $(shell pkg-config --cflags gdlib libpng12 libjpeg)
 IMG_objs = resizer.o
 override DEFS+=-DLIB_GD
 else
