@@ -2,7 +2,8 @@
 #----------------------------
 
 # Any extra options you need
-CFLAGS=-I/usr/local/Cellar/libpng12/1.2.50/include -L/usr/local/Cellar/libpng12/1.2.50/lib
+CFLAGS=-Wall -O2 -DNDEBUG -std=c++98 -Wno-c++11-compat
+#CFLAGS=-Wall -g -DDEBUG -std=c++98 -Wno-c++11-compat
 EXTRADEFS=
 
 # Graphics library to use, can be GD or ImageMagick.
@@ -16,7 +17,7 @@ IMG_LIB=GD
 # discard it as needed. The app uses as little memory as possible
 # but depending on IO load queries can take longer (sometimes a lot).
 # This option is especially useful for a VPS with little memory.
-# override DEFS+=-DUSE_DISK_CACHE
+override DEFS+=-DUSE_DISK_CACHE
 
 # If you do not have any databases created by previous versions of
 # this software, you can uncomment this to not compile in code for
@@ -25,14 +26,14 @@ override DEFS+=-DNO_SUPPORT_OLD_VER
 
 # Enable a significantly less memory intensive but slightly slower
 # method of storing the image index internally (in simple mode).
-override DEFS+=-DUSE_DELTA_QUEUE
+# override DEFS+=-DUSE_DELTA_QUEUE
 
 # Disable use of std::tr1::unordered_map if your compiler/C++ library
 # is old and doesn't have it. This will make many things slower.
 # override DEFS+=-DNO_TR1
 
 # This may help or hurt performance. Try it and see for yourself.
-override DEFS+=-fomit-frame-pointer
+# override DEFS+=-fomit-frame-pointer
 
 # Force use of a platform independent 64-bit database format.
 override DEFS+=-DFORCE_64BIT
@@ -81,14 +82,16 @@ endif
 	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} ${IMG_libs} ${DEFS} ${EXTRADEFS}
 
 test-resizer : test-resizer.o resizer.o debug.o
-	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} -g -lgd -ljpeg -lpng ${DEFS} ${EXTRADEFS} `gdlib-config --ldflags`
+	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} -lgd -ljpeg -lpng ${DEFS} ${EXTRADEFS} `gdlib-config --ldflags`
 
 %.o : %.cpp
-	g++ -c -o $@ $< -O2 -fpeel-loops ${CFLAGS} -DNDEBUG -Wall -DLinuxBuild -g ${IMG_flags} ${DEFS} ${EXTRADEFS}
+	g++ -c -o $@ $< ${CFLAGS} -DLinuxBuild ${IMG_flags} ${DEFS} ${EXTRADEFS}
 
 %.le.o : %.cpp
-	g++ -c -o $@ $< -O2 -fpeel-loops ${CFLAGS} -DCONV_LE -DNDEBUG -Wall -DLinuxBuild -g ${IMG_flags} ${DEFS} ${EXTRADEFS}
+	g++ -c -o $@ $< ${CFLAGS} -DCONV_LE -DLinuxBuild ${IMG_flags} ${DEFS} ${EXTRADEFS}
 
 %.S:	.ALWAYS
-	g++ -S -o $@ $*.cpp -O2 -fpeel-loops ${CFLAGS} -DNDEBUG -Wall -DLinuxBuild -g ${IMG_flags} ${DEFS} ${EXTRADEFS}
+	g++ -S -o $@ $*.cpp ${CFLAGS} -DLinuxBuild ${IMG_flags} ${DEFS} ${EXTRADEFS}
 
+clean:
+	rm *.o
