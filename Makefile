@@ -73,8 +73,8 @@ haar.le.o :
 .ALWAYS:
 
 ifeq (${IMG_LIB},GD)
-IMG_libs = -lgd -ljpeg -lpng $(shell gdlib-config --ldflags; gdlib-config --libs)
-IMG_flags = $(shell gdlib-config --cflags)
+IMG_libs = $(shell pkg-config --libs gdlib libjpeg libpng)
+IMG_flags = $(shell pkg-config --cflags gdlib libjpeg libpng)
 IMG_objs = resizer.o
 override DEFS+=-DLIB_GD
 else
