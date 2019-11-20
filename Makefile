@@ -2,13 +2,11 @@
 #----------------------------
 
 # Any extra options you need
-CFLAGS=-Wall -O2 -DNDEBUG -std=c++98 -Wno-c++11-compat
-#CFLAGS=-Wall -g -DDEBUG -std=c++98 -Wno-c++11-compat
 EXTRADEFS=
 
-# Graphics library to use, can be GD or ImageMagick.
-#IMG_LIB=GD
-IMG_LIB=ImageMagick
+# Graphics library to use, can be GD (recommended) or ImageMagick (deprecated, outdated).
+IMG_LIB=GD
+#IMG_LIB=ImageMagick
 
 # In simple mode, by default all data needed for queries is now
 # read into memory, using in total about 500 bytes per image. It
@@ -17,7 +15,7 @@ IMG_LIB=ImageMagick
 # discard it as needed. The app uses as little memory as possible
 # but depending on IO load queries can take longer (sometimes a lot).
 # This option is especially useful for a VPS with little memory.
-override DEFS+=-DUSE_DISK_CACHE
+# override DEFS+=-DUSE_DISK_CACHE
 
 # If you do not have any databases created by previous versions of
 # this software, you can uncomment this to not compile in code for
@@ -26,17 +24,27 @@ override DEFS+=-DNO_SUPPORT_OLD_VER
 
 # Enable a significantly less memory intensive but slightly slower
 # method of storing the image index internally (in simple mode).
-# override DEFS+=-DUSE_DELTA_QUEUE
+override DEFS+=-DUSE_DELTA_QUEUE
 
-# Disable use of std::tr1::unordered_map if your compiler/C++ library
-# is old and doesn't have it. This will make many things slower.
-# override DEFS+=-DNO_TR1
+# Set this if you have a C++11 compatible compiler with std::unordered_map
+override DEFS+=-DHAVE_UNORDERED_MAP
+# For GCC the C++11 support also needs to be enabled explicitly
+override DEFS+=-std=c++11
+# If your compiler is older and has std::tr1::unordered_map use this
+# override DEFS+=-DHAVE_TR1_UNORDERED_MAP
 
 # This may help or hurt performance. Try it and see for yourself.
-# override DEFS+=-fomit-frame-pointer
+override DEFS+=-fomit-frame-pointer
 
 # Force use of a platform independent 64-bit database format.
 override DEFS+=-DFORCE_64BIT
+
+# By default iqdb uses integer math for the similarity computation,
+# because it is often slightly faster than floating point math
+# (and iqdb cannot make use of SSE et.al.) You can remove this option
+# if you wish to compare both versions. This setting has
+# negligible impact on the value of the similarity result.
+override DEFS+=-DINTMATH
 
 # -------------------------
 #  no configuration below
@@ -45,6 +53,11 @@ override DEFS+=-DFORCE_64BIT
 .SUFFIXES:
 
 all:	iqdb
+
+.PHONY: clean
+
+clean:
+	rm -f *.o iqdb
 
 %.o : %.h
 %.o : %.cpp
@@ -60,8 +73,8 @@ haar.le.o :
 .ALWAYS:
 
 ifeq (${IMG_LIB},GD)
-IMG_libs = $(shell pkg-config --libs gdlib libpng12 libjpeg)
-IMG_flags = $(shell pkg-config --cflags gdlib libpng12 libjpeg)
+IMG_libs = -lgd -ljpeg -lpng $(shell gdlib-config --ldflags; gdlib-config --libs)
+IMG_flags = $(shell gdlib-config --cflags)
 IMG_objs = resizer.o
 override DEFS+=-DLIB_GD
 else
@@ -82,16 +95,14 @@ endif
 	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} ${IMG_libs} ${DEFS} ${EXTRADEFS}
 
 test-resizer : test-resizer.o resizer.o debug.o
-	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} -lgd -ljpeg -lpng ${DEFS} ${EXTRADEFS} `gdlib-config --ldflags`
+	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} -g -lgd -ljpeg -lpng ${DEFS} ${EXTRADEFS} `gdlib-config --ldflags`
 
 %.o : %.cpp
-	g++ -c -o $@ $< ${CFLAGS} -DLinuxBuild ${IMG_flags} ${DEFS} ${EXTRADEFS}
+	g++ -c -o $@ $< -O2 ${CFLAGS} -DNDEBUG -Wall -DLinuxBuild -g ${IMG_flags} ${DEFS} ${EXTRADEFS}
 
 %.le.o : %.cpp
-	g++ -c -o $@ $< ${CFLAGS} -DCONV_LE -DLinuxBuild ${IMG_flags} ${DEFS} ${EXTRADEFS}
+	g++ -c -o $@ $< -O2 ${CFLAGS} -DCONV_LE -DNDEBUG -Wall -DLinuxBuild -g ${IMG_flags} ${DEFS} ${EXTRADEFS}
 
 %.S:	.ALWAYS
-	g++ -S -o $@ $*.cpp ${CFLAGS} -DLinuxBuild ${IMG_flags} ${DEFS} ${EXTRADEFS}
+	g++ -S -o $@ $*.cpp -O2 ${CFLAGS} -DNDEBUG -Wall -DLinuxBuild -g ${IMG_flags} ${DEFS} ${EXTRADEFS}
 
-clean:
-	rm *.o
