@@ -1,4 +1,4 @@
-FROM ubuntu:21.04 AS build
+FROM ubuntu:20.10 AS build
 WORKDIR /iqdb
 RUN \
   apt-get update && \
@@ -6,7 +6,7 @@ RUN \
 COPY *.h *.cpp Makefile ./
 RUN make -j "$(nproc)"
 
-FROM ubuntu:21.04
+FROM ubuntu:20.10
 RUN \
   apt-get update && \
   apt-get install --yes --no-install-recommends libgd3 libjpeg-turbo8 libpng16-16
