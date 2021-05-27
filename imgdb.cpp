@@ -856,8 +856,8 @@ void dbSpaceImpl<is_simple>::load(const char* filename) {
 
 		if (ids[ind] != sig.id) {
 			if (is_simple) {
-				DEBUG_CONT(imgdb)(DEBUG_OUT, "\n");
-				DEBUG(warnings)("WARNING: index %zd DB header ID %08llx mismatch with sig ID %08llx.", ind, (long long)ids[ind], (long long) sig.id);
+				// DEBUG_CONT(imgdb)(DEBUG_OUT, "\n");
+				DEBUG(warnings)("WARNING: index %zd DB header ID %08llx mismatch with sig ID %08llx.\n", ind, (long long)ids[ind], (long long) sig.id);
 			} else {
 				throw data_error("DB header ID mismatch with sig ID.");
 			}
