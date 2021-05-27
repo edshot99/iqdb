@@ -1,0 +1,25 @@
+#!/usr/bin/perl
+#
+# Checks if the server is running. If the server is running, prints the number
+# of loaded images and exits successfully. If the server isn't running, exits
+# with a non-zero status code.
+#
+# Usage: iqdb-status [host] [port]
+
+use warnings;
+use strict;
+
+use IO::Socket::INET;
+
+my $host = shift || "localhost";
+my $port = shift || 5588;
+
+my $socket = IO::Socket::INET->new("$host:$port") or die "Couldn't connect to $host:$port ($@)\n";
+print $socket "count 0\ndone\n";
+
+readline($socket) eq "000 iqdb ready\n" or die;
+readline($socket) =~ /101 count=(\d+)\n/ or die;
+readline($socket) eq "000 iqdb ready\n" or die;
+
+my $count = $1;
+print "$count images\n";
