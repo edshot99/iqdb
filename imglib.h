@@ -303,8 +303,6 @@ protected:
 	container m_tail;
 };
 
-class bloom_filter;
-
 /* in memory signature structure */
 class SigStruct : public image_info {
 public:
@@ -493,7 +491,6 @@ public:
 	virtual bool isImageGrayscale(imageId id);
 	virtual Score calcAvglDiff(imageId id1, imageId id2);
 	virtual Score calcSim(imageId id1, imageId id2, bool ignore_color = false);
-	virtual Score calcDiff(imageId id1, imageId id2, bool ignore_color = false);
 
 	static const int mode_mask_readonly	= 0x01;
 	static const int mode_mask_simple	= 0x02;
@@ -718,48 +715,6 @@ static const uint32_t		SRZ_V_SZ			= (sizeof(res_t)) |
 								  (3 << 20);	// never matches any of the above for endian check
 
 static const uint32_t		SRZ_V_CODE			= (SRZ_V0_9_0) | (SRZ_V_SZ << 8);
-
-/* keyword postings structure */
-static const unsigned int	 AVG_IMGS_PER_KWD	= 1000;
-
-/*
-class keywordStruct {
-	//std::vector<imageId> imgIds;	// img list
-public:
-	keywordStruct() {
-		imgIdsFilter = new bloom_filter(AVG_IMGS_PER_KWD, 1.0/(100.0 * AVG_IMGS_PER_KWD),random_bloom_seed);
-	}
-	bloom_filter* imgIdsFilter;
-
-	~keywordStruct()
-	{
-		delete imgIdsFilter;
-	}
-} ;
-
-typedef std::map<const int, keywordStruct*> keywordsMapType;
-typedef std::map<const int, keywordStruct*>::iterator  keywordsMapIterator;
-*/
-
-// clustering
-/* cluster list structure */
-struct clustersStruct {
-	imageId id;			/* representative image id */
-	std::vector<imageId> imgIds;	/* img list */
-	double diameter;		
-};
-
-typedef std::list<clustersStruct> cluster_list;
-typedef cluster_list::iterator cluster_listIterator;
-
-std::vector<clustersStruct> getClusterDb(const int dbId, const int numClusters);
-std::vector<clustersStruct> getClusterKeywords(const int dbId, const int numClusters,std::vector<int> keywords);
-
-// summaries
-bloom_filter* getIdsBloomFilter(const int dbId);
-
-// util
-// keywordStruct* getKwdPostings(int hash);
 
 // Delayed implementations.
 inline index_iterator<true>::index_iterator(const sigMap<true>::iterator& itr, dbSpaceImpl<true>& db)

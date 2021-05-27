@@ -72,7 +72,6 @@ To be treated as a constant.
 unsigned char imgBin[NUM_PIXELS*NUM_PIXELS];
 int imgBinInited = 0;
 
-unsigned int random_bloom_seed = 0;
 const static bool is_disk_db = true;
 static size_t pageSize = 0;
 static size_t pageMask = 0;
@@ -577,8 +576,6 @@ void dbSpaceImpl<false>::addImageData(const ImgData* img) {
 
 	// insert into sigmap
 	m_images.add_sig(img->id, nsig);
-	// insert into ids bloom filter
-	//imgIdsFilter->insert(id);
 
 	imgbuckets.add(*img, m_nextIndex++);
 }
@@ -1097,25 +1094,10 @@ void dbSpaceImpl<false>::load_stream_old(db_ifstream& f, uint version) {
 				// insert new sig
 				m_images.add_sig(sig.id, nsig);
 			}
-			// insert into ids bloom filter
-			// imgIdsFilter->insert(sig.id);
-			// read kwds
 			int szk;
 			f.read((char *) &(szk), sizeof(int));
 			FLIP(szk);
 			if (szk) throw data_error("Keywords not supported.");
-
-			/*
-			int kwid;
-			if (szk && !nsig->keywords) nsig->keywords = new int_hashset;
-			for (int ki = 0; ki < szk; ki++) {
-				f.read((char *) &(kwid), sizeof(int));
-				FLIP(kwid);
-				nsig->keywords->insert(kwid);
-				// populate keyword postings
-				getKwdPostings(kwid)->imgIdsFilter->insert(nsig->id);
-			}
-			*/
 		}
 
 	if (is_simple && is_disk_db)
@@ -1657,10 +1639,6 @@ Score dbSpaceCommon::calcSim(imageId id1, imageId id2, bool ignore_color) {
 	return DScSc(((DScore) score) * 100 * scale);
 }
 
-Score dbSpaceCommon::calcDiff(imageId id1, imageId id2, bool ignore_color) {
-	return MakeScore(100) - calcSim(id1, id2, ignore_color);
-}
-
 template<>
 void dbSpaceImpl<false>::rehash() {
 	for (buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr) {
@@ -1762,12 +1740,6 @@ stats_t dbSpaceImpl<is_simple>::getCoeffStats() {
 	return ret;
 }
 
-/*
-bloom_filter* getIdsBloomFilter(const int dbId) {
-	return validate_dbid(dbId)->imgIdsFilter;
-}
-*/
-
 template<bool is_simple>
 imageId_list dbSpaceImpl<is_simple>::getImgIdList() {
 	imageId_list ids;
@@ -1802,238 +1774,6 @@ template<> image_info_list dbSpaceImpl<false>::getImgInfoList() {
 }
 template<> image_info_list dbSpaceImpl<true>::getImgInfoList() { return m_info; }
 
-/*
-// return structure containing filter with all image ids that have this keyword
-keywordStruct* getKwdPostings(int hash) {
-	keywordStruct* nks;
-	if (globalKwdsMap.find(hash) == globalKwdsMap.end()) { // never seen this keyword, create new postings list
-		nks = new keywordStruct();		
-		globalKwdsMap[hash] = nks;		
-	} else { // already know about it just fetch then
-		nks = globalKwdsMap[hash];
-	}
-	return nks;
-}
-
-// keywords in images
-bool addKeywordImg(const int dbId, const int id, const int hash) {		
-	validate_imgid(dbId, id);
-
-	// populate keyword postings
-	getKwdPostings(hash)->imgIdsFilter->insert(id);
-
-	// populate image kwds
-	if (!dbSpace[dbId]->sigs[id]->keywords) dbSpace[dbId]->sigs[id]->keywords = new int_hashset;
-	return dbSpace[dbId]->sigs[id]->keywords->insert(hash).second;
-}
-
-bool addKeywordsImg(const int dbId, const int id, int_vector hashes){
-	validate_imgid(dbId, id);
-
-	// populate keyword postings
-	for (intVectorIterator it = hashes.begin(); it != hashes.end(); it++) {			
-		getKwdPostings(*it)->imgIdsFilter->insert(id);
-	}
-
-	// populate image kwds
-	if (!dbSpace[dbId]->sigs[id]->keywords) dbSpace[dbId]->sigs[id]->keywords = new int_hashset;
-	int_hashset& imgKwds = *dbSpace[dbId]->sigs[id]->keywords;
-	imgKwds.insert(hashes.begin(),hashes.end());
-	return true;
-}
-
-bool removeKeywordImg(const int dbId, const int id, const int hash){
-	validate_imgid(dbId, id);
-
-	//TODO remove from kwd postings, maybe creating an API method for regenerating kwdpostings filters or 
-	// calling it internally after a number of kwd removes
-	if (!dbSpace[dbId]->sigs[id]->keywords) dbSpace[dbId]->sigs[id]->keywords = new int_hashset;
-	return dbSpace[dbId]->sigs[id]->keywords->erase(hash);
-}
-
-bool removeAllKeywordImg(const int dbId, const int id){
-	validate_imgid(dbId, id);
-	//TODO remove from kwd postings
-	//dbSpace[dbId]->sigs[id]->keywords.clear();
-	delete dbSpace[dbId]->sigs[id]->keywords;
-	dbSpace[dbId]->sigs[id]->keywords = NULL;
-	return true;
-}
-
-std::vector<int> getKeywordsImg(const int dbId, const int id){
-	validate_imgid(dbId, id);
-	int_vector ret;
-	if (!dbSpace[dbId]->sigs[id]->keywords) return ret;
-	int_hashset& imgKwds = *dbSpace[dbId]->sigs[id]->keywords;
-	ret.insert(ret.end(),imgKwds.begin(),imgKwds.end());
-	return ret;
-}
-
-// query by keywords
-std::vector<int> mostPopularKeywords(const int dbId, std::vector<imageId> imgs, std::vector<int> excludedKwds, int count, int mode) {
-
-	kwdFreqMap freqMap = kwdFreqMap();
-
-	for (longintVectorIterator it = imgs.begin(); it != imgs.end(); it++) {
-		if (!dbSpace[dbId]->sigs[*it]->keywords) continue;
-		int_hashset& imgKwds = *dbSpace[dbId]->sigs[*it]->keywords;
-
-		for (int_hashset::iterator itkw = imgKwds.begin(); itkw != imgKwds.end(); itkw++) {			
-			if (freqMap.find(*itkw) == freqMap.end()) {
-				freqMap[*itkw] = 1;
-			} else {
-				freqMap[*itkw]++;
-			}
-		}
-	}
-
-	kwdFreqPriorityQueue pqKwds;
-
-	int_hashset setExcludedKwds = int_hashset();
-
-	for (intVectorIterator uit = excludedKwds.begin(); uit != excludedKwds.end(); uit++) {
-		setExcludedKwds.insert(*uit);
-	}
-	
-	for (kwdFreqMap::iterator it = freqMap.begin(); it != freqMap.end(); it++) {
-		int id = it->first;
-		long int freq = it->second;
-		if (setExcludedKwds.find(id) != setExcludedKwds.end()) continue; // skip excluded kwds
-		pqKwds.push(KwdFrequencyStruct(id,freq));
-	}
-
-	int_vector res = int_vector();
-
-	while (count >0 && !pqKwds.empty()) {
-		KwdFrequencyStruct kf = pqKwds.top();
-		pqKwds.pop();
-		res.push_back(kf.kwdId);
-		res.push_back(kf.freq);
-		count--;
-	}
-	
-	return res;
-
-}
-
-// query by keywords
-sim_vector queryImgIDKeywords(const int dbId, imageId id, unsigned int numres, int kwJoinType, int_vector keywords){
-	validate_dbid(dbId);
-
-	if (id != 0) validate_imgid(dbId, id);
-
-	// populate filter
-	intVectorIterator it = keywords.begin();
-	bloom_filter* bf = 0;
-	if (*it == 0) {
-		// querying all tags
-	} else {
-		// OR or AND each kwd postings filter to get final filter
-		// start with the first one
-		bf = new bloom_filter(*(getKwdPostings(*it)->imgIdsFilter));
-		it++;
-		for (; it != keywords.end(); it++) { // iterate the rest
-			if (kwJoinType) { // and'd
-				(*bf) &= *(getKwdPostings(*it)->imgIdsFilter);
-			} else { // or'd
-				(*bf) |= *(getKwdPostings(*it)->imgIdsFilter);
-			}
-		}
-	}
-
-	if (id == 0) { // random images with these kwds
-
-		sim_vector V; // select all images with the desired keywords		
-		for (sigIterator sit = dbSpace[dbId]->sigs.begin(); sit != dbSpace[dbId]->sigs.end(); sit++) {
-			if (V.size() > 20*numres) break;
-
-			if ((bf == 0) || (bf->contains((*sit).first))) { // image has desired keyword or we're querying random
-				// XXX V.push_back(std::make_pair(sit->first, (double)1));
-			}
-		}
-
-		sim_vector Vres;
-
-		for (size_t var = 0; var < std::min<size_t>(V.size(), numres); ) { // var goes from 0 to numres
-			int rint = rand()%V.size();
-			if (V[rint].second > 0) { // havent added this random result yet
-				// XXX Vres.push_back(std::make_pair(V[rint].first, (double)0));
-				V[rint].second = 0;
-				++var;
-			}
-			++var;
-		}
-
-		return Vres;
-	}
-	return queryImgIDFiltered(dbId, id, numres, bf);
-
-}
-sim_vector queryImgIDFastKeywords(const int dbId, imageId id, unsigned int numres, int kwJoinType, int_vector keywords){
-	validate_imgid(dbId, id);
-
-	throw usage_error("not yet implemented");
-}
-sim_vector queryImgDataFastKeywords(const int dbId, int * sig1, int * sig2, int * sig3, Score *avgl, unsigned int numres, int flags, int kwJoinType, std::vector<int> keywords){
-	validate_dbid(dbId);
-
-	throw usage_error("not yet implemented");
-}
-std::vector<imageId> getAllImgsByKeywords(const int dbId, const unsigned int numres, int kwJoinType, std::vector<int> keywords){
-	validate_dbid(dbId);
-
-	std::vector<imageId> res; // holds result of img lists
-
-	if (keywords.empty())
-		throw usage_error("ERROR: keywords list must have at least one hash");
-
-	// populate filter
-	intVectorIterator it = keywords.begin();
-
-	// OR or AND each kwd postings filter to get final filter
-	// start with the first one
-	bloom_filter* bf = new bloom_filter(*(getKwdPostings(*it)->imgIdsFilter));
-	it++;
-	for (; it != keywords.end(); it++) { // iterate the rest
-		if (kwJoinType) { // and'd
-			(*bf) &= *(getKwdPostings(*it)->imgIdsFilter);
-		} else { // or'd
-			(*bf) |= *(getKwdPostings(*it)->imgIdsFilter);
-		}
-	}
-
-	for (sigIterator sit = dbSpace[dbId]->sigs.begin(); sit != dbSpace[dbId]->sigs.end(); sit++) {
-		if (bf->contains((*sit).first)) res.push_back((*sit).first);
-		if (res.size() >= numres) break; // ok, got enough
-	}
-	delete bf;
-	return res;
-}
-double getKeywordsVisualDistance(const int dbId, int distanceType, std::vector<int> keywords){
-	validate_dbid(dbId);
-
-	throw usage_error("not yet implemented");
-}
-
-// keywords
-std::vector<int> getKeywordsPopular(const int dbId, const unsigned int numres) {
-	validate_dbid(dbId);
-
-	throw usage_error("not yet implemented");
-}
-
-// clustering
-
-std::vector<clustersStruct> getClusterDb(const int dbId, const int numClusters) {
-	validate_dbid(dbId);
-	throw usage_error("not yet implemented");
-} 
-std::vector<clustersStruct> getClusterKeywords(const int dbId, const int numClusters,std::vector<int> keywords) {
-	validate_dbid(dbId);
-	throw usage_error("not yet implemented");
-}
-*/
-
 dbSpace::dbSpace() { }
 dbSpace::~dbSpace() { }
 
@@ -2050,8 +1790,6 @@ dbSpaceImpl<is_simple>::dbSpaceImpl(bool with_struct) :
 
 	if (with_struct)
 		m_sigFile = tempfile();
-
-	// imgIdsFilter = new bloom_filter(AVG_IMGS_PER_DBSPACE, 1.0/(100.0 * AVG_IMGS_PER_DBSPACE),random_bloom_seed);
 }
 
 dbSpaceAlter::dbSpaceAlter(bool readonly) : m_f(NULL), m_readonly(readonly) {
@@ -2061,7 +1799,6 @@ dbSpaceAlter::dbSpaceAlter(bool readonly) : m_f(NULL), m_readonly(readonly) {
 template<>
 dbSpaceImpl<false>::~dbSpaceImpl() {
 	close(m_sigFile);
-	// delete imgIdsFilter;
 	for (imageIterator itr = image_begin(); itr != image_end(); ++itr)
 		delete itr.sig();
 }
@@ -2069,7 +1806,6 @@ dbSpaceImpl<false>::~dbSpaceImpl() {
 template<>
 dbSpaceImpl<true>::~dbSpaceImpl() {
 	if (m_sigFile != -1) close(m_sigFile);
-	// delete imgIdsFilter;
 }
 
 dbSpaceAlter::~dbSpaceAlter() {

@@ -251,20 +251,17 @@ struct ImgData {
 };
 
 class dbSpace;
-class bloom_filter;
 class db_ifstream;
 class db_ofstream;
 
 // Non-standard query arguments.
 struct queryOpt {
-	queryOpt(int fl = 0) : flags(fl), bfilter(NULL), mask_and(0), mask_xor(0) { }
-	void filter(bloom_filter* bf) { bfilter = bf; }
+	queryOpt(int fl = 0) : flags(fl), mask_and(0), mask_xor(0) { }
 	void mask(uint16_t maskAnd, uint16_t maskXor);
 	void reset();
 
 	int		flags;
 
-	bloom_filter*	bfilter;
 	uint16_t	mask_and;
 	uint16_t	mask_xor;
 };
@@ -277,7 +274,6 @@ struct queryArg : public queryOpt {
 	queryArg(const char* filename, unsigned int numres, int flags);
 
 	// Chainable modifier functions to set non-standard arguments.
-	queryArg& filter(bloom_filter* bf) { queryOpt::filter(bf); return *this; }
 	queryArg& mask(uint16_t maskAnd, uint16_t maskXor) { queryOpt::mask(maskAnd, maskXor); return *this; }
 
 	// Copy, move and reset non-standard arguments.
@@ -350,7 +346,6 @@ public:
 	// Similarity.
 	virtual Score calcAvglDiff(imageId id1, imageId id2) = 0;
 	virtual Score calcSim(imageId id1, imageId id2, bool ignore_color = false) = 0;
-	virtual Score calcDiff(imageId id1, imageId id2, bool ignore_color = false) = 0;
 
 protected:
 	dbSpace();
@@ -377,7 +372,6 @@ inline void queryOpt::mask(uint16_t maskAnd, uint16_t maskXor) {
 }
 inline void queryOpt::reset() {
 	mask_and = mask_xor = 0;
-	bfilter = NULL;
 	flags = flags & ~dbSpace::flags_internal;
 }
 inline queryArg::queryArg(dbSpace* db, imageId id, unsigned int nr, int fl) : queryOpt(fl), numres(nr) {
@@ -399,7 +393,6 @@ inline queryArg::queryArg(const void* data, size_t data_size, unsigned int nr, i
 inline queryArg& queryArg::merge(const queryOpt& q) {
 	mask_and = q.mask_and;
 	mask_xor = q.mask_xor;
-	bfilter = q.bfilter;
 	flags = (flags & ~dbSpace::flags_internal) | (q.flags & dbSpace::flags_internal);
 	return *this;
 }
