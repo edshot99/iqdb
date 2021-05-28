@@ -17,11 +17,6 @@ IMG_LIB=GD
 # This option is especially useful for a VPS with little memory.
 # override DEFS+=-DUSE_DISK_CACHE
 
-# If you do not have any databases created by previous versions of
-# this software, you can uncomment this to not compile in code for
-# upgrading old versions (use iqdb rehash <dbfile> to upgrade).
-override DEFS+=-DNO_SUPPORT_OLD_VER
-
 # Enable a significantly less memory intensive but slightly slower
 # method of storing the image index internally (in simple mode).
 override DEFS+=-DUSE_DELTA_QUEUE
@@ -91,17 +86,11 @@ endif
 % : %.o haar.o imgdb.o debug.o ${IMG_objs} # bloom_filter.o
 	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} ${IMG_libs} ${DEFS} ${EXTRADEFS}
 
-%.le : %.le.o haar.le.o imgdb.le.o debug.le.o ${IMG_objs} # bloom_filter.le.o
-	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} ${IMG_libs} ${DEFS} ${EXTRADEFS}
-
 test-resizer : test-resizer.o resizer.o debug.o
 	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} -g -lgd -ljpeg -lpng ${DEFS} ${EXTRADEFS} `gdlib-config --ldflags`
 
 %.o : %.cpp
 	g++ -c -o $@ $< -O2 ${CFLAGS} -DNDEBUG -Wall -DLinuxBuild -g ${IMG_flags} ${DEFS} ${EXTRADEFS}
-
-%.le.o : %.cpp
-	g++ -c -o $@ $< -O2 ${CFLAGS} -DCONV_LE -DNDEBUG -Wall -DLinuxBuild -g ${IMG_flags} ${DEFS} ${EXTRADEFS}
 
 %.S:	.ALWAYS
 	g++ -S -o $@ $*.cpp -O2 ${CFLAGS} -DNDEBUG -Wall -DLinuxBuild -g ${IMG_flags} ${DEFS} ${EXTRADEFS}

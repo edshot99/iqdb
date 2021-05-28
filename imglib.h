@@ -435,8 +435,6 @@ struct id_index_iterator<true,B> : public B {
 
 // Simplify reading/writing stream data.
 #define READER_WRAPPERS \
-	template<typename T> \
-	T read_size(int size) { union { char s[16]; T v; } dummy; dummy.v = 0; base_type::read(dummy.s, size); return dummy.v; } \
 	\
 	template<typename T> \
 	T read() { T dummy; base_type::read((char*) &dummy, sizeof(T)); return dummy; } \
@@ -591,7 +589,6 @@ private:
 	imageIterator find(imageId i);
 
 	virtual void load(const char* filename);
-	virtual void load_stream_old(db_ifstream& f, uint version);
 
 	bool skip_image(const imageIterator& itr, const queryArg& query);
 

@@ -78,40 +78,6 @@ static size_t pageMask = 0;
 static size_t pageImgs = 0;
 static size_t pageImgMask = 0;
 
-/* Endianness */
-#if CONV_LE && (__BIG_ENDIAN__ || _BIG_ENDIAN || BIG_ENDIAN)
-#define CONV_ENDIAN 1
-#else
-#define CONV_ENDIAN 0
-#endif
-
-#if CONV_ENDIAN
-#define FLIP(x) flip_endian(x)
-#define FLIPPED(x) flipped_endian(x)
-#else
-#define FLIP(x)
-#define FLIPPED(x) (x)
-#endif
-
-template<typename T>
-void flip_endian(T& v) {
-	//if (sizeof(T) != 4) throw fatal_error("Can't flip this endian.");
-	union { T _v; char _c[sizeof(T)]; } c; c._v = v;
-	for (char* one = c._c, * two = c._c + sizeof(T) - 1; one < two; one++, two--) {
-		char t = *one; *one = *two; *two = t;
-	}
-	v = c._v;
-};
-
-template<typename T>
-T flipped_endian(T& v) {
-	T f = v;
-	flip_endian(f);
-	return f;
-}
-
-//typedef std::priority_queue < KwdFrequencyStruct > kwdFreqPriorityQueue;
-
 mapped_file::mapped_file(const char* fname, bool writable) {
 	int fd = open(fname, writable ? O_RDWR : O_RDONLY);
 	struct stat st;
@@ -767,86 +733,43 @@ void dbSpaceAlter::setImageRes(imageId id, int width, int height) {
 template<bool is_simple>
 void dbSpaceImpl<is_simple>::load(const char* filename) {
 	db_ifstream f(filename);
+    DEBUG(imgdb)("Loading db... ");
+
 	if (!f.is_open()) {
-		DEBUG(warnings)("Unable to open file %s for read ops: %s.\n", filename, strerror(errno));
-		return;
+        DEBUG(warnings)("Unable to open file %s for read ops: %s.\n", filename, strerror(errno));
+        return;
 	}
 
-	uint32_t v_code = FLIPPED(f.read<uint32_t>());
-	uint version;
+	uint32_t v_code = f.read<uint32_t>();
 	uint32_t intsizes = v_code >> 8;
+	uint version = v_code & 0xff;
 
-	if (intsizes == 0) {
-		DEBUG(warnings)("Old database version.\n");
+	if (intsizes != SRZ_V_SZ) {
+        throw data_error("Cannot load database with wrong endianness or data sizes");
+	} else if (version != SRZ_V0_9_0) {
+		throw data_error("Database is from an unsupported version (not 0.9.0)");
 	}
 
-	version = v_code & 0xff;
-
-	// Old version... skip its useless metadata.
-	if (version == 1) {
-		version = FLIPPED(f.read<int>());
-		f.read<int>(); f.read<int>(); f.read<int>();
-	}
-
-	if (version > SRZ_V0_9_0) {
-		throw data_error("Database from a version after 0.9.0");
-	} else if (version < SRZ_V0_7_0) {
-		return load_stream_old(f, version);
-	} else if (intsizes != SRZ_V_SZ) {
-		if (CONV_ENDIAN)
-			throw data_error("Cannot load database with both wrong endianness AND data sizes");
-		DEBUG(imgdb)("Loading db (converting data sizes)... ");
-	} else if (version == SRZ_V0_9_0) {
-		DEBUG(imgdb)("Loading db (cur ver)... ");
-	} else {
-		DEBUG(imgdb)("Loading db (old but compatible ver)... ");
-	}
-
-	int size_res =     (intsizes >>  0) & 31;
-	int size_count =   (intsizes >>  5) & 31;
-	int size_offset =  (intsizes >> 10) & 31;
-	int size_imageId = (intsizes >> 15) & 31;
-
-	count_t numImg = FLIPPED(f.read_size<count_t>(size_count));
-	offset_t firstOff = FLIPPED(f.read_size<offset_t>(size_offset));
+	count_t numImg = f.read<count_t>();
+	offset_t firstOff = f.read<offset_t>();
 	DEBUG_CONT(imgdb)(DEBUG_OUT, "has %" FMT_count_t " images at %llx. ", numImg, (long long)firstOff);
 
 	// read bucket sizes and reserve space so that buckets do not
 	// waste memory due to exponential growth of std::vector
 	for (typename buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr)
-		itr->reserve(FLIPPED(f.read_size<count_t>(size_count)));
+		itr->reserve(f.read<count_t>());
 	DEBUG_CONT(imgdb)(DEBUG_OUT, "bucket sizes done at %llx... ", (long long)firstOff);
 
 	// read IDs (for verification only)
 	AutoCleanArray<imageId> ids(numImg);
-	if (sizeof(imageId) == size_imageId) {
-		f.read(ids.ptr(), numImg);
-	} else {
-		for (typename image_map::size_type k = 0; k < numImg; k++)
-			ids[k] = f.read_size<imageId>(size_imageId);
-	}
-
-	for (typename image_map::size_type k = 0; k < numImg; k++)
-		FLIP(ids[k]);
+    f.read(ids.ptr(), numImg);
 
 	// read sigs
 	f.seekg(firstOff);
 	if (is_simple) m_info.resize(numImg);
 	for (typename image_map::size_type k = 0; k < numImg; k++) {
 		ImgData sig;
-		if (intsizes == SRZ_V_SZ) {
-			f.read(&sig);
-		} else {
-			memset(&sig, 0, sizeof(sig));
-			sig.id = f.read_size<imageId>(size_imageId);
-			f.read(&sig.sig1);
-			f.read(&sig.sig2);
-			f.read(&sig.sig3);
-			f.read(&sig.avglf);
-			sig.width = f.read_size<res_t>(size_res);
-			sig.height = f.read_size<res_t>(size_res);
-		}
-		FLIP(sig.id); FLIP(sig.width); FLIP(sig.height); FLIP(sig.avglf[0]); FLIP(sig.avglf[1]); FLIP(sig.avglf[2]);
+        f.read(&sig);
 
 		size_t ind = m_nextIndex++;
 		imgbuckets.add(sig, ind);
@@ -909,7 +832,7 @@ void dbSpaceAlter::load(const char* filename) {
 		}
 		m_f->exceptions(std::fstream::badbit | std::fstream::failbit);
 
-		uint32_t v_code = FLIPPED(m_f->read<uint32_t>());
+		uint32_t v_code = m_f->read<uint32_t>();
 		uint version = v_code & 0xff;
 
 		if ((v_code >> 8) == 0) {
@@ -923,18 +846,18 @@ void dbSpaceAlter::load(const char* filename) {
 
 		DEBUG(imgdb)("Loading db header (cur ver)... ");
 		m_hdrOff = m_f->tellg();
-		count_t numImg = FLIPPED(m_f->read<count_t>());
-		m_sigOff = FLIPPED(m_f->read<offset_t>());
+		count_t numImg = m_f->read<count_t>();
+		m_sigOff = m_f->read<offset_t>();
 
 		DEBUG_CONT(imgdb)(DEBUG_OUT, "has %" FMT_count_t " images. ", numImg);
 		// read bucket sizes
 		for (buckets_t::iterator itr = m_buckets.begin(); itr != m_buckets.end(); ++itr)
-			itr->size = FLIPPED(m_f->read<count_t>());
+			itr->size = m_f->read<count_t>();
 
 		// read IDs
 		m_imgOff = m_f->tellg();
 		for (size_t k = 0; k < numImg; k++)
-			m_images[FLIPPED(m_f->read<count_t>())] = k;
+			m_images[m_f->read<count_t>()] = k;
 
 		m_rewriteIDs = false;
 		DEBUG_CONT(imgdb)(DEBUG_OUT, "complete!\n");
@@ -947,168 +870,6 @@ void dbSpaceAlter::load(const char* filename) {
 		DEBUG_CONT(imgdb)(DEBUG_OUT, "failed!\n");
 		throw;
 	}
-}
-
-template<>
-void dbSpaceImpl<true>::load_stream_old(db_ifstream& f, uint version) {
-	throw usage_error("Not supported in read-only mode.");
-}
-
-template<>
-void dbSpaceImpl<false>::load_stream_old(db_ifstream& f, uint version) {
-#ifdef NO_SUPPORT_OLD_VER
-	throw data_error("Cannot load old database version: NO_SUPPORT_OLD_VER was set.");
-#else
-	static const bool is_simple = false;
-	DEBUG(imgdb)("Loading db (old ver)... ");
-
-	imageId id;
-	uint sz;	
-
-	if (version < SRZ_V0_6_0) {
-		throw data_error("Database from a version prior to 0.6");
-	} else if (version > SRZ_V0_6_1) {
-		throw data_error("Database from a version after 0.6.1");
-	}
-
-	// fast-forward to image count
-	db_ifstream::pos_type old_pos = f.tellg();
-	m_bucketsValid = true;
-	for (buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr) {
-		sz = FLIPPED(f.read<int>());
-		if (sz == ~uint()) {
-			if (itr != imgbuckets.begin()) throw data_error("No-bucket indicator too late.");
-				m_bucketsValid = false;
-			DEBUG_CONT(imgdb)(DEBUG_OUT, "NO BUCKETS VERSION! ");
-			sz = FLIPPED(f.read<int>());
-		}
-		if (m_bucketsValid)
-			f.seekg(sz * sizeof(imageId), f.cur);
-	}
-	image_map::size_type szt;
-	f.read((char *) &(szt), sizeof(szt));
-	FLIP(szt);
-	f.seekg(old_pos);
-	DEBUG_CONT(imgdb)(DEBUG_OUT, "has %zd images. ", szt);
-	//To discard most common buckets: szt /= 10;
-
-	// read buckets
-	if (!m_bucketsValid)
-		f.read((char *) &(sz), sizeof(int));
-
-	for (buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr) {
-		f.read((char *) &(sz), sizeof(int));
-		FLIP(sz);
-		if (!sz) continue;
-
-		if (!m_bucketsValid) {
-			itr->reserve(sz);
-			continue;
-		}
-
-		if (is_simple && sz > szt) {
-//fprintf(stderr, "Bucket %d:%d:%d has %d/%zd, ignoring.\n", c, pn, i, sz, szt*10);
-			f.seekg(sz * sizeof(imageId), f.cur);
-			continue;
-		}
-
-//fprintf(stdout, "c=%d:p=%d:%d=%d images\n", c, pn, i, sz);
-		size_t szp = is_simple ? sz : sz & ~pageImgMask;
-		if (szp) {
-			if (sz - szp >= itr->threshold) szp = sz;
-			itr->resize(szp);
-			AutoImageIdIndex_map<is_simple> map(itr->map_all(true));
-//fprintf(stderr, "Mapped bucket to %d bytes at %p(%p). Reading to %p. ", map.m_length, map.m_base, map.m_img, &(map[0]));
-			f.read((char *) &*map.begin(), szp * sizeof(imageId));
-			itr->loaded(szp);
-			for (idIndexIterator itr(map.begin(), *this); itr != map.end(); ++itr)
-				FLIP(itr->id);
-			sz -= szp;
-		}
-		for (size_t k = 0; k < sz; k++) {
-			f.read((char *) &id, sizeof(imageId));
-			FLIP(id);
-			itr->push_back(id);
-		}
-//fprintf(stderr, "Bucket has %zd capacity paged, %zd in pages, %zd in tail.\n", bucket.paged_capacity(), bucket.paged_size(), bucket.tail_size());
-//fprintf(stderr, "Done.\n");
-	}
-	DEBUG_CONT(imgdb)(DEBUG_OUT, "buckets done... ");
-
-	// read sigs
-	f.read((char *) &(szt), sizeof(szt));
-	FLIP(szt);
-	DEBUG_CONT(imgdb)(DEBUG_OUT, "%zd images... ", szt);
-	if (version == SRZ_V0_6_0) DEBUG_CONT(imgdb)(DEBUG_OUT, "converting from v6.0... ");
-
-	if (is_simple) m_info.resize(szt);
-
-		for (image_map::size_type k = 0; k < szt; k++) {
-			ImgData sig;
-
-			if (version == SRZ_V0_6_0) {
-				Idx* sigs[3] = { sig.sig1, sig.sig2, sig.sig3 };
-				f.read((char *) &sig.id, sizeof(sig.id));
-				for (int s = 0; s < 3; s++) for (int i = 0; i < NUM_COEFS; i++) {
-					int idx;
-					f.read((char *) &idx, sizeof(idx));
-					sigs[s][i] = idx;
-				}
-				f.read((char *) sig.avglf, sizeof(sig.avglf));
-				f.read((char *) &sig.width, sizeof(sig.width));
-				f.read((char *) &sig.height, sizeof(sig.height));
-			} else {
-				f.read((char *) &sig, sizeof(ImgData));
-			}
-			FLIP(sig.id); FLIP(sig.width); FLIP(sig.height); FLIP(sig.avglf[0]); FLIP(sig.avglf[1]); FLIP(sig.avglf[2]);
-
-			size_t ind = m_nextIndex++;
-			if (!m_bucketsValid)
-				imgbuckets.add(sig, ind);
-
-			if (is_simple) {
-				m_info[ind].id = sig.id;
-				SigStruct::avglf2i(sig.avglf, m_info[ind].avgl);
-				m_info[ind].width = sig.width;
-				m_info[ind].height = sig.height;
-				m_images.add_index(sig.id, ind);
-
-				if (m_sigFile == -1) {
-					int szk;
-					f.read((char *) &(szk), sizeof(int));
-					FLIP(szk);
-					if (szk) throw data_error("Can't use keywords in simple DB mode.");
-					continue;
-				}
-
-				size_t ofs = get_sig_cache();
-				if (ofs != ind * sizeof(ImgData)) throw internal_error("Index and cache out of sync!");
-				write_sig_cache(ofs, &sig);
-
-			} else {
-				SigStruct* nsig = new SigStruct(get_sig_cache());
-				nsig->init(&sig);
-				nsig->index = ind;
-				write_sig_cache(nsig->cacheOfs, &sig);
-
-				// insert new sig
-				m_images.add_sig(sig.id, nsig);
-			}
-			int szk;
-			f.read((char *) &(szk), sizeof(int));
-			FLIP(szk);
-			if (szk) throw data_error("Keywords not supported.");
-		}
-
-	if (is_simple && is_disk_db)
-		DEBUG_CONT(imgdb)(DEBUG_OUT, "map size: %lld... ", (long long int) lseek(imgbuckets[0][0][0].fd(), 0, SEEK_CUR));
-
-	for (buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr)
-		itr->set_base();
-	m_bucketsValid = true;
-	DEBUG_CONT(imgdb)(DEBUG_OUT, "complete!\n");
-	f.close();
-#endif
 }
 
 static inline dbSpace* make_dbSpace(int mode) {
@@ -1571,8 +1332,6 @@ inline void dbSpaceCommon::bucket_set<B>::remove(const ImgData& nsig) {
 	lumin_native avgl;
 	SigStruct::avglf2i(nsig.avglf, avgl);
 	for (int i = 0; 0 && i < NUM_COEFS; i++) {
-		FLIP(nsig.sig1[i]); FLIP(nsig.sig2[i]); FLIP(nsig.sig3[i]);
-//fprintf(stderr, "\r%d %d %d %d", i, nsig.sig1[i], nsig.sig2[i], nsig.sig3[i]);
 		if (nsig.sig1[i]>0) buckets[0][0][nsig.sig1[i]].remove(nsig.id);
 		if (nsig.sig1[i]<0) buckets[0][1][-nsig.sig1[i]].remove(nsig.id);
 
@@ -1688,54 +1447,9 @@ stats_t dbSpaceImpl<is_simple>::getCoeffStats() {
 	stats_t ret;
 	ret.reserve(imgbuckets.count());
 
-#ifdef DEBUG_STATS
-	typedef std::tr1::unordered_map<int, size_t> deltas_t;
-	deltas_t deltas;
-	size_t total = 0, b4 = 0, b70 = 0, b16k = 0, a16k = 0, b255 = 0;
-#endif
-
 	for (typename buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr) {
 		ret.push_back(std::make_pair(itr - imgbuckets.begin(), itr->size()));
-
-#ifdef DEBUG_STATS
-		AutoImageIdIndex_map<is_simple> map(itr->map_all(false));
-		size_t last = 0;
-		for (idIndexIterator itr(map.begin(), *this); itr != map.end(); ++itr) {
-			size_t delta = itr.index() - last;
-			total++;
-			if (delta < 5) b4++;
-			else if (delta < 71) b70++;
-			else if (delta < 16455) b16k++;
-			else a16k++;
-			if (delta < 255) b255++;
-			deltas[delta]++;
-			last = itr.index();
-		}
-#endif
 	}
-
-#ifdef DEBUG_STATS
-	typedef std::pair<size_t, int> delta_t;
-	std::priority_queue<delta_t, std::vector<delta_t>, std::greater<delta_t> > deltas_max;
-	deltas_t::iterator itr = deltas.begin();
-	for (; deltas_max.size() < 128 && itr != deltas.end(); ++itr)
-		deltas_max.push(std::make_pair(itr->second, itr->first));
-	for (; itr != deltas.end(); ++itr) {
-		deltas_max.push(std::make_pair(itr->second, itr->first));
-		deltas_max.pop();
-	}
-	while (!deltas_max.empty()) {
-		deltas.erase(deltas_max.top().second);
-		ret.push_back(std::make_pair(deltas_max.top().second, deltas_max.top().first));
-		deltas_max.pop();
-	}
-	ret.push_back(std::make_pair(~size_t(), total));
-	ret.push_back(std::make_pair(4, b4));
-	ret.push_back(std::make_pair(70, b70));
-	ret.push_back(std::make_pair(16454, b16k));
-	ret.push_back(std::make_pair(~size_t(), a16k));
-	ret.push_back(std::make_pair(255, b255));
-#endif
 
 	return ret;
 }
