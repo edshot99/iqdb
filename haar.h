@@ -59,9 +59,6 @@ typedef struct valStruct_ {
 
 typedef std::priority_queue<valStruct> valqueue;
 
-//#define max(a, b)  (((a) > (b)) ? (a) : (b))
-//#define min(a, b)  (((a) > (b)) ? (b) : (a))
-
 void initImgBin();
 void transform(Unit *a, Unit *b, Unit *c);
 void transformChar(unsigned char *c1, unsigned char *c2, unsigned char *c3, Unit *a, Unit *b, Unit *c);

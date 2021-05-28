@@ -72,79 +72,6 @@
     }                                                 \
   } while (0)
 
-#if 0
-/* Haar 2D transform.
-   Not doing any scaling by 1/sqrt(128).
-   Better cache behaviour when processing array by array.
-
-   This version needs a different imgBin array! FIXME.
-*/
-static void
-haar2D(Unit a[])
-{
-  int i, i1;
-
-  /* scale by 1/sqrt(128) = 0.08838834764831843: */
-  /*
-  for (i = 0; i < NUM_PIXELS_SQUARED; i++)
-    a[i] *= 0.08838834764831843;
-  */
-
-  /* Decompose rows: */
-  for (i = 0; i < NUM_PIXELS_SQUARED; i = i1) {
-    Unit C = 1;
-    int l, l1;
-
-    i1 = i + NUM_PIXELS;	/* start of next row, next i */
-    for (l = 1; l < NUM_PIXELS; l = l1) {
-      int j;
-
-      C *= 0.7071;		/* 1/sqrt(2) */
-      l1 = l << 1;		/* l1 = 2*l, next l */
-      for (j = i; j < i1; j += l1) {
-        int j1 = j+l;
-	Unit t1;
-
-	t1 = (a[j] - a[j1]) * C;
-	a[j] += a[j1];
-	a[j1] = t1;
-      }
-    }
-    /* Fix first element of each row: */
-    a[i] *= C;	/* C = 1/sqrt(NUM_PIXELS) */
-  }
-
-  /* scale by 1/sqrt(128) = 0.08838834764831843: */
-  /*
-  for (i = 0; i < NUM_PIXELS_SQUARED; i++)
-    a[i] *= 0.08838834764831843;
-  */
-
-  /* Decompose columns: */
-  for (i = 0; i < NUM_PIXELS; i++) {
-    Unit C = 1;
-    int l, l1;
-
-    for (l = 1; l < NUM_PIXELS; l = l1) {
-      int j;
-
-      C *= 0.7071;		/* 1/sqrt(2) = 0.7071 */
-      l1 = l << 1;		/* l1 = 2*l, next l */
-      for (j = i; j < i+NUM_PIXELS_SQUARED; j += l1*NUM_PIXELS) {
-        int j1 = j+(l*NUM_PIXELS);
-	Unit t1;
-
-	t1 = (a[j] - a[j1]) * C;
-	a[j] += a[j1];
-	a[j1] = t1;
-      }
-    }
-    /* Fix first element of each column: */
-    a[i] *= C;
-  }
-}
-#else
-
 // Do the Haar tensorial 2d transform itself.
 // Here input is RGB data [0..255] in Unit arrays
 // Computation is (almost) in-situ.
@@ -152,12 +79,6 @@ static void
 haar2D(Unit a[]) {
   int i;
   Unit t[NUM_PIXELS >> 1];
-
-  // scale by 1/sqrt(128) = 0.08838834764831843:
-  /*
-  for (i = 0; i < NUM_PIXELS_SQUARED; i++)
-    a[i] *= 0.08838834764831843;
-  */
 
   // Decompose rows:
   for (i = 0; i < NUM_PIXELS_SQUARED; i += NUM_PIXELS) {
@@ -181,12 +102,6 @@ haar2D(Unit a[]) {
     // Fix first element of each row:
     a[i] *= C; // C = 1/sqrt(NUM_PIXELS)
   }
-
-  // scale by 1/sqrt(128) = 0.08838834764831843:
-  /*
-  for (i = 0; i < NUM_PIXELS_SQUARED; i++)
-    a[i] *= 0.08838834764831843;
-  */
 
   // Decompose columns:
   for (i = 0; i < NUM_PIXELS; i++) {
@@ -213,7 +128,6 @@ haar2D(Unit a[]) {
     a[i] *= C;
   }
 }
-#endif
 
 /* Do the Haar tensorial 2d transform itself.
    Here input is RGB data [0..255] in Unit arrays.

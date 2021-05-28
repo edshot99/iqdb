@@ -47,10 +47,7 @@ extern int debug_level;
 
 namespace imgdb {
 
-//#define DEBUG_QUERY
-
 // Globals
-//keywordsMapType globalKwdsMap;
 #ifdef INTMATH
 Score weights[2][6][3];
 
@@ -337,16 +334,16 @@ void initImgBin() {
   int i, j;
 
   /*
-	0 1 2 3 4 5 6 i
-	0 0 1 2 3 4 5 5 
-	1 1 1 2 3 4 5 5
-	2 2 2 2 3 4 5 5
-	3 3 3 3 3 4 5 5
-	4 4 4 4 4 4 5 5
-	5 5 5 5 5 5 5 5
-	5 5 5 5 5 5 5 5
-	j
-	 */
+    0 1 2 3 4 5 6 i
+    0 0 1 2 3 4 5 5
+    1 1 1 2 3 4 5 5
+    2 2 2 2 3 4 5 5
+    3 3 3 3 3 4 5 5
+    4 4 4 4 4 4 5 5
+    5 5 5 5 5 5 5 5
+    5 5 5 5 5 5 5 5
+    j
+  */
 
   /* Every position has value 5, */
   memset(imgBin, 5, NUM_PIXELS_SQUARED);
@@ -457,33 +454,6 @@ inline void dbSpaceCommon::bucket_set<B>::add(const ImgData &nsig, count_t index
   SigStruct::avglf2i(nsig.avglf, avgl);
   for (int i = 0; i < NUM_COEFS; i++) { // populate buckets
 
-#ifdef FAST_POW_GEERT
-    int x, t;
-    // sig[i] never 0
-    int x, t;
-
-    x = nsig.sig1[i];
-    t = (x < 0); /* t = 1 if x neg else 0 */
-    /* x - 0 ^ 0 = x; i - 1 ^ 0b111..1111 = 2-compl(x) = -x */
-    x = (x - t) ^ -t;
-    buckets[0][t][x].add(nsig.id, index);
-
-    if (is_grayscale(avg))
-      continue; // ignore I/Q coeff's if chrominance too low
-
-    x = nsig.sig2[i];
-    t = (x < 0);
-    x = (x - t) ^ -t;
-    buckets[1][t][x].add(nsig.id, index);
-
-    x = nsig.sig3[i];
-    t = (x < 0);
-    x = (x - t) ^ -t;
-    buckets[2][t][x].add(nsig.id, index);
-
-    should not fail
-
-#else //FAST_POW_GEERT \
     //imageId_array3 (imgbuckets = dbSpace[dbId]->(imgbuckets;
     if (nsig.sig1[i] > 0)
       buckets[0][0][nsig.sig1[i]].add(nsig.id, index);
@@ -502,19 +472,13 @@ inline void dbSpaceCommon::bucket_set<B>::add(const ImgData &nsig, count_t index
       buckets[2][0][nsig.sig3[i]].add(nsig.id, index);
     if (nsig.sig3[i] < 0)
       buckets[2][1][-nsig.sig3[i]].add(nsig.id, index);
-
-#endif //FAST_POW_GEERT
   }
 }
 
 template <typename B>
 inline B &dbSpaceCommon::bucket_set<B>::at(int col, int coeff, int *idxret) {
   int pn, idx;
-  //TODO see if FAST_POW_GEERT gives the same results
-#ifdef FAST_POW_GEERT
-  pn = coeff < 0;
-  idx = (coeff - pn) ^ -pn;
-#else
+
   pn = 0;
   if (coeff > 0) {
     pn = 0;
@@ -523,7 +487,7 @@ inline B &dbSpaceCommon::bucket_set<B>::at(int col, int coeff, int *idxret) {
     pn = 1;
     idx = -coeff;
   }
-#endif
+
   if (idxret)
     *idxret = idx;
   return buckets[col][pn][idx];
@@ -1218,48 +1182,6 @@ dbSpaceImpl<is_simple>::queryImg(const queryArg &query) {
   else
     return do_query<3>(query);
 }
-
-// cluster by similarity. Returns list of list of imageIds (img ids)
-/*
-imageId_list_2 clusterSim(const int dbId, float thresd, int fast = 0) {
-	imageId_list_2 res;		// will hold a list of lists. ie. a list of clusters
-	sigMap wSigs(dbSpace[dbId]->sigs);		// temporary map of sigs, as soon as an image becomes part of a cluster, it's removed from this map
-	sigMap wSigsTrack(dbSpace[dbId]->sigs);	// temporary map of sigs, as soon as an image becomes part of a cluster, it's removed from this map
-
-	for (sigIterator sit = wSigs.begin(); sit != wSigs.end(); sit++) {	// for every img on db
-		imageId_list res2;
-
-		if (fast) {
-			res2 =
-				queryImgDataForThresFast(&wSigs, (*sit).second->avgl,
-				thresd, 1);
-		} else {
-			res2 =
-				queryImgDataForThres(dbId, &wSigs, (*sit).second->sig1,
-				(*sit).second->sig2,
-				(*sit).second->sig3,
-				(*sit).second->avgl, thresd, 1);
-		}
-		//    continue;
-		imageId hid = (*sit).second->id;
-		//    if () 
-		wSigs.erase(hid);
-		if (res2.size() <= 1) {
-			if (wSigs.size() <= 1)
-				break;		// everything already added to a cluster sim. Bail out immediately, otherwise next iteration 
-			// will segfault when incrementing sit
-			continue;
-		}
-		res2.push_front(hid);
-		res.push_back(res2);
-		if (wSigs.size() <= 1)
-			break;
-		// sigIterator sit2 = wSigs.end();
-		//    sigIterator sit3 = sit++;
-	}
-	return res;
-}
- */
 
 template <>
 void dbSpaceImpl<false>::removeImage(imageId id) {

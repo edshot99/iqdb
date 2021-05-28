@@ -91,7 +91,6 @@ union image_id_index {
   bool operator!=(const image_id_index &other) const { return id != other.id; }
 
   operator size_t &() { return index; }
-  // operator imageId&() { return id; }
 };
 
 typedef std::vector<image_id_index> IdIndex_list;
@@ -148,11 +147,8 @@ struct imageIdIndex_map : public mapped_file {
   imageIdIndex_map() {}
   imageIdIndex_map(void *base, iterator img, iterator end, size_t l)
       : mapped_file(base, l), m_img(img), m_end(end) {}
-  //image_id_index& operator[] (size_t ofs) { return m_img[ofs]; }
-  //bool operator! () { return !m_base; }
   iterator begin() { return m_img; }
   iterator end() { return m_end; }
-  //size_t size() { return m_end - m_img; }
 
   iterator m_img;
   iterator m_end;
@@ -192,7 +188,6 @@ public:
     if (num > m_base.size())
       m_tail.reserve(num - m_base.size());
   }
-  //void resize(size_t num) { if (num <= size()) return; m_tail.resize(num - m_base.size()); }
   void loaded(size_t num) {
     if (num != m_tail.size())
       throw data_error("Loaded incorrect number.");
@@ -272,8 +267,6 @@ class SigStruct : public image_info {
 public:
   size_t index; /* index into score array for queries */
 
-  //int_hashset* keywords;
-
   size_t cacheOfs;
 
   SigStruct(size_t ofs) : cacheOfs(ofs){};
@@ -281,7 +274,6 @@ public:
   SigStruct(){};
 
   ~SigStruct() {
-    //delete keywords;
   }
 
   void init(const ImgData *nsig) {
@@ -291,23 +283,6 @@ public:
     avglf2i(nsig->avglf, avgl);
   }
 };
-
-/*
-class KwdFrequencyStruct {
-public:
-	int kwdId;
-	long int freq;	
-
-	KwdFrequencyStruct(int kwdId, long int freq): kwdId(kwdId),freq(freq) {}
-
-	bool operator< (const KwdFrequencyStruct & right) const {
-		return freq > (right.freq);
-	}
-};
-*/
-
-// typedefs
-//typedef std::map<const int, imageId> kwdFreqMap;
 
 template <bool is_simple>
 class dbSpaceImpl;

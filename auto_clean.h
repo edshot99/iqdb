@@ -58,20 +58,6 @@ private:
   AutoClean &operator=(const AutoClean &);
 };
 
-template <typename T, void (*cleanup_func)(T &)>
-class AutoCleanF : public T {
-public:
-  AutoCleanF() {}
-  AutoCleanF(const T &v) : T(v) {}
-  ~AutoCleanF() { (*cleanup_func)(*static_cast<T *>(this)); }
-
-  T *operator&() { return static_cast<T *>(this); }
-
-private:
-  AutoCleanF(const AutoCleanF &);
-  AutoCleanF &operator=(const AutoCleanF &);
-};
-
 template <typename T>
 class AutoCleanPtr {
 public:
