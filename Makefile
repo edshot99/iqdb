@@ -4,19 +4,6 @@
 # Any extra options you need
 EXTRADEFS=
 
-# In simple mode, by default all data needed for queries is now
-# read into memory, using in total about 500 bytes per image. It
-# is possible to select a disk cache using mmap for this instead.
-# Then the kernel can read this memory into the filecache or
-# discard it as needed. The app uses as little memory as possible
-# but depending on IO load queries can take longer (sometimes a lot).
-# This option is especially useful for a VPS with little memory.
-# override DEFS+=-DUSE_DISK_CACHE
-
-# Enable a significantly less memory intensive but slightly slower
-# method of storing the image index internally (in simple mode).
-override DEFS+=-DUSE_DELTA_QUEUE
-
 # For GCC the C++11 support also needs to be enabled explicitly
 override DEFS+=-std=c++11
 

@@ -112,10 +112,7 @@ template<> struct map_iterator<false> : public std::iterator<std::forward_iterat
 
 	image_id_index* m_p;
 };
-#ifdef USE_DELTA_QUEUE
-#ifdef USE_DISK_CACHE
-#error Sorry, delta queue and disk cache cannot be used at the same time.
-#endif
+
 template<> struct map_iterator<true> : public delta_iterator {
 	typedef delta_iterator base_type;
 
@@ -125,17 +122,6 @@ template<> struct map_iterator<true> : public delta_iterator {
 
 	size_t get_index() const { return **this; }
 };
-#else
-template<> struct map_iterator<true> : public map_iterator<false> {
-	typedef map_iterator<false> base_type;
-
-	map_iterator(const size_t* idx) : base_type((image_id_index*)idx) { }
-	map_iterator(const IdIndex_list::iterator& itr) : base_type(&*itr) { }
-	map_iterator() { }
-
-	size_t get_index() const { return (*this)->index; }
-};
-#endif
 
 struct mapped_file {
 	mapped_file() : m_base(NULL) { }
@@ -182,7 +168,6 @@ template<>
 class imageIdIndex_list<true, true> {
 public:
 	static const size_t threshold = 0;
-#ifdef USE_DELTA_QUEUE
 	class container : public delta_queue {
 	public:
 		struct const_iterator : public delta_iterator {
@@ -190,16 +175,6 @@ public:
 			size_t get_index() const { return **this; }
 		};
 	};
-#else
-	class container : public IdIndex_list {
-	public:
-		struct const_iterator : public IdIndex_list::const_iterator {
-			typedef IdIndex_list::const_iterator base_type;
-			const_iterator(const base_type& itr) : base_type(itr) { }
-			size_t get_index() const { return (*this)->index; }
-		};
-	};
-#endif
 
 	imageIdIndex_map<true> map_all(bool writable) { return writable ? imageIdIndex_map<true>(NULL, m_tail.begin(), m_tail.end(), 0) : imageIdIndex_map<true>(NULL, m_base.begin(), m_base.end(), 0); };
 	bool empty() { return m_tail.empty() && m_base.empty(); }
@@ -531,11 +506,7 @@ public:
 	virtual void rehash();
 
 private:
-#ifdef USE_DISK_CACHE
-	static const bool is_memory = false;
-#else
 	static const bool is_memory = is_simple;
-#endif
 
 	typedef index_iterator<is_simple> imageIterator;
 	typedef sigMap<is_simple> image_map;

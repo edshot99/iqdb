@@ -244,7 +244,6 @@ void imageIdIndex_list<false, false>::remove(image_id_index i) {
 void imageIdIndex_list<true, true>::set_base() {
 	if (!m_base.empty()) return;
 
-#ifdef USE_DELTA_QUEUE
 	if (m_tail.base_size() * 17 / 16 + 16 < m_tail.base_capacity()) {
 		container copy;
 		copy.reserve(m_tail.base_size(), true);
@@ -257,9 +256,6 @@ void imageIdIndex_list<true, true>::set_base() {
 	} else {
 		m_base.swap(m_tail);
 	}
-#else
-	m_base.swap(m_tail);
-#endif
 }
 
 int dbSpace::mode_from_name(const char* mode_name) {
