@@ -54,16 +54,6 @@ typedef AutoCleanPtrF<gdImage, &gdImageDestroy> AutoGDImage;
 size_t get_image_info(const unsigned char* data, size_t length, image_info* info);
 
 // Take image data at given memory location and length, and resize
-// to thu_x*thu_y (or, if thu_y = 0, the dimensions with the right
-// aspect ratio fitting in box thu_x*thu_x), and return it.
-// If allow_prescaled is set, large images will be prescaled while
-// loading, and not loaded at full resolution. The minimum resolution
-// at which this happens depends on the image format and what loading
-// scalers it supports. It will always load it at least at twice
-// the desired thumbnail resolution so that the final downscaling
-// does not look blocky.
-// JPEG		4*dim
-// PNG		
-// GIF
-resizer_result resize_image_data(const unsigned char* data, size_t len, unsigned int thu_x, unsigned int thu_y, bool allow_prescaled);
+// to thu_x*thu_y and return it.
+resizer_result resize_image_data(const unsigned char* data, size_t len, unsigned int thu_x, unsigned int thu_y);
 

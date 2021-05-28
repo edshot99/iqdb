@@ -572,7 +572,7 @@ void dbSpaceCommon::addImageBlob(imageId id, const void *blob, size_t length) {
 	::image_info info;
 	get_image_info((const unsigned char*) blob, length, &info);
 
-	AutoGDImage image(resize_image_data((const unsigned char*) blob, length, NUM_PIXELS, NUM_PIXELS, true));
+	AutoGDImage image(resize_image_data((const unsigned char*) blob, length, NUM_PIXELS, NUM_PIXELS));
 
 	ImgData sig;
 	sigFromImage(image, id, &sig);
@@ -581,7 +581,7 @@ void dbSpaceCommon::addImageBlob(imageId id, const void *blob, size_t length) {
 
 void dbSpaceCommon::imgDataFromFile(const char* filename, imageId id, ImgData* img) {
 	AutoClean<mapped_file, &mapped_file::unmap> map(mapped_file(filename, false));
-	AutoGDImage image(resize_image_data((const unsigned char*) map.m_base, map.m_length, NUM_PIXELS, NUM_PIXELS, true));
+	AutoGDImage image(resize_image_data((const unsigned char*) map.m_base, map.m_length, NUM_PIXELS, NUM_PIXELS));
 	sigFromImage(image, id, img);
 }
 
@@ -589,7 +589,7 @@ void dbSpaceCommon::imgDataFromBlob(const void* data, size_t data_size, imageId 
 	::image_info info;
 	get_image_info((const unsigned char*) data, data_size, &info);
 
-	AutoGDImage image(resize_image_data((const unsigned char*) data, data_size, NUM_PIXELS, NUM_PIXELS, true));
+	AutoGDImage image(resize_image_data((const unsigned char*) data, data_size, NUM_PIXELS, NUM_PIXELS));
 	sigFromImage(image, id, img);
 }
 
