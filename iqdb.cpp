@@ -47,6 +47,11 @@
 #include "debug.h"
 #include "imgdb.h"
 
+#include "vendor/json.hpp"
+#include "vendor/httplib.h"
+
+using nlohmann::json;
+
 int debug_level = DEBUG_errors | DEBUG_base | DEBUG_summary | DEBUG_connections | DEBUG_images | DEBUG_imgdb; // | DEBUG_dupe_finder; // | DEBUG_resizer;
 
 static void die(const char fmt[], ...) __attribute__ ((format (printf, 1, 2))) __attribute__ ((noreturn));
@@ -641,6 +646,51 @@ void server(const char* hostport, int numfiles, char** files, bool listen2) {
 	}
 }
 
+void http_server(const std::string host, const int port, const std::string database_filename) {
+	httplib::Server server;
+    dbSpaceAuto memory_db(database_filename.c_str(), imgdb::dbSpace::mode_simple);
+
+	server.Post("/query", [&](const auto& request, auto& response) {
+        int limit = 10;
+        const int flags = 0;
+        json data;
+
+        if (!request.has_file("file"))
+		    throw imgdb::param_error("`POST /query` requires a `file` param");
+
+        if (request.has_param("limit"))
+            limit = stoi(request.get_param_value("limit"));
+
+        const auto& file = request.get_file_value("file");
+        const imgdb::queryArg query(file.content.c_str(), file.content.size() - 1, limit, flags);
+        const auto matches = memory_db->queryImg(query);
+
+        for(const auto& match : matches) {
+            data += {
+              { "id", match.id },
+              { "score", ScD(match.score) },
+              { "width", match.width },
+              { "height", match.height },
+            };
+        }
+
+		response.set_content(data.dump(4), "application/json");
+	});
+
+	server.Get("/status", [&](const auto& request, auto& response) {
+        const int count = memory_db->getImgCount();
+        json data = { { "images", count } };
+		response.set_content(data.dump(4), "application/json");
+	});
+
+    server.set_logger([](const auto& req, const auto& res) {
+        DEBUG(summary)("%s \"%s %s %s\" %d %zd\n", req.remote_addr.c_str(), req.method.c_str(), req.path.c_str(), req.version.c_str(), res.status, res.body.size());
+    });
+
+    DEBUG(summary)("Listening on %s:%i.\n", host.c_str(), port);
+	server.listen(host.c_str(), port);
+}
+
 void help() {
 	printf(	"Usage: iqdb add|list|help args...\n"
 		"\tadd dbfile - Read images to add in the form ID:filename from stdin.\n"
@@ -693,6 +743,8 @@ int main(int argc, char** argv) {
 		server(argv[2], argc-3, argv+3, false);
 	} else if (!strcasecmp(argv[1], "listen2")) {
 		server(argv[2], argc-3, argv+3, true);
+	} else if (!strcasecmp(argv[1], "http")) {
+		http_server("localhost", 8000, "iqdb.db");
 	} else if (!strcasecmp(argv[1], "statistics")) {
 		stats(filename);
 	} else if (!strcasecmp(argv[1], "count")) {
