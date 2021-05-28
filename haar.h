@@ -25,6 +25,7 @@
 
 /* STL Includes */
 #include <queue>
+#include <cinttypes>
 
 /* Number of pixels on one side of image; required to be a power of 2. */
 #define NUM_PIXELS 128

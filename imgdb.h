@@ -73,7 +73,7 @@ typedef uint64_t offset_t;
 typedef int64_t res_t;
 
 #define __STDC_FORMAT_MACROS
-#include <inttypes.h>
+#include <cinttypes>
 #undef __STDC_FORMAT_MACROS
 
 #define FMT_imageId PRIx64
