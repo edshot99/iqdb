@@ -397,37 +397,6 @@ void dbSpaceCommon::sigFromImage(Image* image, imageId id, ImgData* sig) {
 	AutoCleanArray<unsigned char> gchan(NUM_PIXELS*NUM_PIXELS);
 	AutoCleanArray<unsigned char> bchan(NUM_PIXELS*NUM_PIXELS);
 
-#if LIB_ImageMagick
-	AutoExceptionInfo exception;
-
-	/*
-	Initialize the image info structure and read an image.
-	 */
-
-	sig->id = id;
-	sig->width = image->columns;
-	sig->height = image->rows;
-
-	//resize_image = SampleImage(image, NUM_PIXELS, NUM_PIXELS, &exception);
-	Image* resize_image = NULL;
-	if (image->columns != NUM_PIXELS || image->rows != NUM_PIXELS) {
-		resize_image = ResizeImage(image, NUM_PIXELS, NUM_PIXELS, TriangleFilter, 1.0, &exception);
-		if (!resize_image)
-			throw image_error("Unable to resize image.");
-		image = resize_image;
-	}
-	// To clean up resize_image on return or exceptions.
-	AutoImage resize_image_auto(resize_image);
-
-	const PixelPacket *pixel_cache = AcquireImagePixels(image, 0, 0, NUM_PIXELS, NUM_PIXELS, &exception);
-
-	for (int idx = 0; idx < NUM_PIXELS*NUM_PIXELS; idx++) {
-		rchan[idx] = pixel_cache->red >> (QuantumDepth - 8);
-		gchan[idx] = pixel_cache->green >> (QuantumDepth - 8);
-		bchan[idx] = pixel_cache->blue >> (QuantumDepth - 8);
-		pixel_cache++;
-	}
-#elif LIB_GD
 	sig->id = id;
 	sig->width = image->sx;
 	sig->height = image->sy;
@@ -447,9 +416,6 @@ void dbSpaceCommon::sigFromImage(Image* image, imageId id, ImgData* sig) {
 		*green++ = gdTrueColorGetGreen(*col);
 		*blue++ = gdTrueColorGetBlue(*col);
 	}
-#else
-#	error Unsupported image library.
-#endif
 
 	AutoCleanArray<Unit> cdata1(NUM_PIXELS*NUM_PIXELS);
 	AutoCleanArray<Unit> cdata2(NUM_PIXELS*NUM_PIXELS);
@@ -603,56 +569,6 @@ void dbSpaceAlter::addImageData(const ImgData* img) {
 	m_images[img->id] = ind;
 }
 
-#if LIB_ImageMagick
-inline void check_image(Image* image) {
-	if (!image)	// unable to read image
-		throw image_error("Unable to read image data.");
-
-	if (image->colorspace != RGBColorspace && image->colorspace != sRGBColorspace)
-		throw image_error("Invalid color space.");
-	if (image->storage_class != DirectClass) {
-		SyncImage(image);
-		SetImageType(image, TrueColorType);
-		SyncImage(image);
-	}
-}
-
-void dbSpaceCommon::addImageBlob(imageId id, const void *blob, size_t length) {
-	if (hasImage(id)) // image already in db
-		throw duplicate_id("Image already in database.");
-
-	AutoExceptionInfo exception;
-	AutoImageInfo image_info;
-	AutoImage image(BlobToImage(image_info, blob, length, &exception));
-	if (exception.severity != UndefinedException) CatchException(&exception);
-	check_image(image);
-
-	ImgData sig;
-	sigFromImage(image, id, &sig);
-	return addImageData(&sig);
-}
-
-void dbSpaceCommon::imgDataFromFile(const char* filename, imageId id, ImgData* img) {
-	AutoExceptionInfo exception;
-	AutoImageInfo image_info;
-
-	strcpy(image_info->filename, filename);
-	AutoImage image(ReadImage(image_info, &exception));
-	if (exception.severity != UndefinedException) CatchException(&exception);
-	check_image(image);
-	sigFromImage(image, id, img);
-}
-
-void dbSpaceCommon::imgDataFromBlob(const void* data, size_t data_size, imageId id, ImgData* img) {
-	AutoExceptionInfo exception;
-	AutoImageInfo image_info;
-	AutoImage image(BlobToImage(image_info, data, data_size, &exception));
-	if (exception.severity != UndefinedException) CatchException(&exception);
-	check_image(image);
-	sigFromImage(image, id, img);
-}
-
-#elif LIB_GD
 void dbSpaceCommon::addImageBlob(imageId id, const void *blob, size_t length) {
 	if (hasImage(id)) // image already in db
 		throw duplicate_id("Image already in database.");
@@ -680,8 +596,6 @@ void dbSpaceCommon::imgDataFromBlob(const void* data, size_t data_size, imageId 
 	AutoGDImage image(resize_image_data((const unsigned char*) data, data_size, NUM_PIXELS, NUM_PIXELS, true));
 	sigFromImage(image, id, img);
 }
-
-#endif
 
 void dbSpaceCommon::addImage(imageId id, const char *filename) {
 	if (hasImage(id)) // image already in db

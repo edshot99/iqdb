@@ -50,14 +50,7 @@ different but the majority of the actual code is the same for both types.
 #include <fstream>
 #include <iostream>
 
-#if LIB_GD
 #include "resizer.h"
-#elif LIB_ImageMagick
-#include <magick/api.h>
-#else
-#error Unsupported image library.
-#endif
-
 #include "auto_clean.h"
 #include "delta_queue.h"
 #include "haar.h"
@@ -179,37 +172,7 @@ struct AutoImageIdIndex_map : public imageIdIndex_map<is_simple> {
 	~AutoImageIdIndex_map() { base_type::unmap(); }
 };
 
-#if LIB_ImageMagick
-// Clean up Image when it goes out of scope.
-struct ImagePtr {
-	ImagePtr(Image* i) : m_image(i) { }
-	void destroy() { if (m_image) DestroyImage(m_image); m_image=NULL; }
-	bool operator! () { return !m_image; }
-	operator Image* () { return m_image; }
-	operator const Image* () const { return m_image; }
-	Image* m_image;
-};
-typedef AutoClean<ImagePtr, &ImagePtr::destroy> AutoImage;
-
-// Same for ExceptionInfo and ImageInfo.
-struct AutoExceptionInfo : public ExceptionInfo {
-	AutoExceptionInfo() { GetExceptionInfo(this); }
-	~AutoExceptionInfo() { DestroyExceptionInfo(this); }
-};
-struct ImageInfoPtr {
-	ImageInfoPtr() : m_info(CloneImageInfo(NULL)) { }
-	void destroy() { DestroyImageInfo(m_info); }
-	ImageInfo* operator->() { return m_info; }
-	operator ImageInfo* () { return m_info; }
-	operator const ImageInfo* () const { return m_info; }
-	ImageInfo* m_info;
-};
-typedef AutoClean<ImageInfoPtr, &ImageInfoPtr::destroy> AutoImageInfo;
-#endif
-
-#if LIB_GD
 typedef gdImage Image;
-#endif
 
 typedef std::pair<off_t, size_t> imageIdPage;
 

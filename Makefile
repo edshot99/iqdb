@@ -4,10 +4,6 @@
 # Any extra options you need
 EXTRADEFS=
 
-# Graphics library to use, can be GD (recommended) or ImageMagick (deprecated, outdated).
-IMG_LIB=GD
-#IMG_LIB=ImageMagick
-
 # In simple mode, by default all data needed for queries is now
 # read into memory, using in total about 500 bytes per image. It
 # is possible to select a disk cache using mmap for this instead.
@@ -60,21 +56,9 @@ haar.le.o :
 
 .ALWAYS:
 
-ifeq (${IMG_LIB},GD)
 IMG_libs = $(shell pkg-config --libs gdlib libjpeg libpng)
 IMG_flags = $(shell pkg-config --cflags gdlib libjpeg libpng)
 IMG_objs = resizer.o
-override DEFS+=-DLIB_GD
-else
-ifeq (${IMG_LIB}, ImageMagick)
-IMG_libs = $(shell pkg-config --libs ImageMagick)
-IMG_flags = $(shell pkg-config --cflags ImageMagick)
-IMG_objs =
-override DEFS+=-DLIB_ImageMagick
-else
-$(error Unsupported image library '${IMG_LIB}' selected.)
-endif
-endif
 
 % : %.o haar.o imgdb.o debug.o ${IMG_objs} # bloom_filter.o
 	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} ${IMG_libs} ${DEFS} ${EXTRADEFS}
