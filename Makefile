@@ -50,9 +50,6 @@ IMG_objs = resizer.o
 % : %.o haar.o imgdb.o debug.o ${IMG_objs} # bloom_filter.o
 	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} ${IMG_libs} ${DEFS} ${EXTRADEFS}
 
-test-resizer : test-resizer.o resizer.o debug.o
-	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} -g -lgd -ljpeg -lpng ${DEFS} ${EXTRADEFS} `gdlib-config --ldflags`
-
 %.o : %.cpp
 	g++ -c -o $@ $< -O2 ${CFLAGS} -DNDEBUG -Wall -DLinuxBuild -g ${IMG_flags} ${DEFS} ${EXTRADEFS}
 
