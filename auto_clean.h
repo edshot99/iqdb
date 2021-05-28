@@ -46,104 +46,143 @@
 
 #include <stdexcept>
 
-template<typename T, void (T::*cleanup_func)()>
+template <typename T, void (T::*cleanup_func)()>
 class AutoClean : public T {
 public:
-	AutoClean() { }
-	AutoClean(const T& v) : T(v) { }
-	~AutoClean() { (this->*cleanup_func)(); }
+  AutoClean() {}
+  AutoClean(const T &v) : T(v) {}
+  ~AutoClean() { (this->*cleanup_func)(); }
 
 private:
-	AutoClean(const AutoClean&);
-	AutoClean& operator = (const AutoClean&);
+  AutoClean(const AutoClean &);
+  AutoClean &operator=(const AutoClean &);
 };
 
-template<typename T, void (*cleanup_func)(T&)>
+template <typename T, void (*cleanup_func)(T &)>
 class AutoCleanF : public T {
 public:
-	AutoCleanF() { }
-	AutoCleanF(const T& v) : T(v) { }
-	~AutoCleanF() { (*cleanup_func)(*static_cast<T*>(this)); }
+  AutoCleanF() {}
+  AutoCleanF(const T &v) : T(v) {}
+  ~AutoCleanF() { (*cleanup_func)(*static_cast<T *>(this)); }
 
-	T* operator&() { return static_cast<T*>(this); }
+  T *operator&() { return static_cast<T *>(this); }
 
 private:
-	AutoCleanF(const AutoCleanF&);
-	AutoCleanF& operator = (const AutoCleanF&);
+  AutoCleanF(const AutoCleanF &);
+  AutoCleanF &operator=(const AutoCleanF &);
 };
 
-template<typename T>
+template <typename T>
 class AutoCleanPtr {
 public:
-	AutoCleanPtr() : m_p(NULL) { }
-	AutoCleanPtr(T* p) : m_p(p) { }
-	~AutoCleanPtr() { set(NULL); }
+  AutoCleanPtr() : m_p(NULL) {}
+  AutoCleanPtr(T *p) : m_p(p) {}
+  ~AutoCleanPtr() { set(NULL); }
 
-	T* set(T* p) { T* old = m_p; delete m_p; m_p = p; return old; }
-	T* detach() { T* old = m_p; m_p = NULL; return old; }
+  T *set(T *p) {
+    T *old = m_p;
+    delete m_p;
+    m_p = p;
+    return old;
+  }
+  T *detach() {
+    T *old = m_p;
+    m_p = NULL;
+    return old;
+  }
 
-	operator T* () { return m_p; }
-	operator const T* () const { return m_p; }
+  operator T *() { return m_p; }
+  operator const T *() const { return m_p; }
 
-	T& operator* () { return *m_p; }
-	T* operator->() { return m_p; }
-	bool operator!(){ return !m_p; }
+  T &operator*() { return *m_p; }
+  T *operator->() { return m_p; }
+  bool operator!() { return !m_p; }
 
 private:
-	AutoCleanPtr(const AutoCleanPtr&);
-	AutoCleanPtr& operator = (const AutoCleanPtr&);
+  AutoCleanPtr(const AutoCleanPtr &);
+  AutoCleanPtr &operator=(const AutoCleanPtr &);
 
-	T* m_p;
+  T *m_p;
 };
 
-template<typename T, void (*cleanup_func)(T*)>
+template <typename T, void (*cleanup_func)(T *)>
 class AutoCleanPtrF {
 public:
-	AutoCleanPtrF() : m_p(NULL) { }
-	AutoCleanPtrF(T* p) : m_p(p) { }
-	AutoCleanPtrF(const AutoCleanPtrF& other) : m_p(NULL) { if (other.m_p) throw std::runtime_error("Bad AutoCleanPtrF copy."); }
-	~AutoCleanPtrF() { set(NULL); }
+  AutoCleanPtrF() : m_p(NULL) {}
+  AutoCleanPtrF(T *p) : m_p(p) {}
+  AutoCleanPtrF(const AutoCleanPtrF &other) : m_p(NULL) {
+    if (other.m_p)
+      throw std::runtime_error("Bad AutoCleanPtrF copy.");
+  }
+  ~AutoCleanPtrF() { set(NULL); }
 
-	T* set(T* p) { T* old = m_p; if (m_p) cleanup_func(m_p); m_p = p; return old; }
-	T* detach() { T* old = m_p; m_p = NULL; return old; }
+  T *set(T *p) {
+    T *old = m_p;
+    if (m_p)
+      cleanup_func(m_p);
+    m_p = p;
+    return old;
+  }
+  T *detach() {
+    T *old = m_p;
+    m_p = NULL;
+    return old;
+  }
 
-	operator T* () { return m_p; }
-	operator const T* () const { return m_p; }
+  operator T *() { return m_p; }
+  operator const T *() const { return m_p; }
 
-	T& operator* () { return *m_p; }
-	T* operator->() { return m_p; }
-	bool operator!(){ return !m_p; }
+  T &operator*() { return *m_p; }
+  T *operator->() { return m_p; }
+  bool operator!() { return !m_p; }
 
 private:
-	AutoCleanPtrF& operator = (const AutoCleanPtrF&);
+  AutoCleanPtrF &operator=(const AutoCleanPtrF &);
 
-	T* m_p;
+  T *m_p;
 };
 
-template<typename T>
+template <typename T>
 class AutoCleanArray {
 public:
-	AutoCleanArray() : m_p(NULL) { }
-	AutoCleanArray(T* p) : m_p(p) { }
-	explicit AutoCleanArray(size_t count) : m_p(new T[count]) { }
-	~AutoCleanArray() { delete[] m_p; m_p = NULL; }
+  AutoCleanArray() : m_p(NULL) {}
+  AutoCleanArray(T *p) : m_p(p) {}
+  explicit AutoCleanArray(size_t count) : m_p(new T[count]) {}
+  ~AutoCleanArray() {
+    delete[] m_p;
+    m_p = NULL;
+  }
 
-	T* set(T* p) { T* old = m_p; delete[] m_p; m_p = p; return old; }
-	T* set(size_t count) { T* old = m_p; delete[] m_p; m_p = new T[count]; return old; }
-	T* detach() { T* old = m_p; m_p = NULL; return old; }
-	//operator T* () { return m_p; }
-	T* ptr() { return m_p; }
+  T *set(T *p) {
+    T *old = m_p;
+    delete[] m_p;
+    m_p = p;
+    return old;
+  }
+  T *set(size_t count) {
+    T *old = m_p;
+    delete[] m_p;
+    m_p = new T[count];
+    return old;
+  }
+  T *detach() {
+    T *old = m_p;
+    m_p = NULL;
+    return old;
+  }
+  //operator T* () { return m_p; }
+  T *ptr() { return m_p; }
 
-	T& operator[](size_t ind) { return m_p[ind]; }
+  T &operator[](size_t ind) { return m_p[ind]; }
 
-	T& operator* () { return *m_p; }
-	T* operator->() { return m_p; }
+  T &operator*() { return *m_p; }
+  T *operator->() { return m_p; }
 
 private:
-	AutoCleanArray(const AutoCleanArray&);
-	AutoCleanArray& operator = (const AutoCleanArray&);
+  AutoCleanArray(const AutoCleanArray &);
+  AutoCleanArray &operator=(const AutoCleanArray &);
 
-	T* m_p;
+  T *m_p;
 };
 
 #endif // AUTO_CLEAN_H

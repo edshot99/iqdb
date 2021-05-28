@@ -46,9 +46,9 @@
 */
 
 /* C Includes */
-#include <math.h> 
-#include <stdio.h> 
-#include <stdlib.h> 
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* imgSeek Includes */
@@ -56,21 +56,21 @@
 
 // RGB -> YIQ colorspace conversion; Y luminance, I,Q chrominance.
 // If RGB in [0..255] then Y in [0..255] and I,Q in [-127..127].
-#define RGB_2_YIQ(a, b, c) \
-  do { \
-    int i; \
-    \
-    for (i = 0; i < NUM_PIXELS_SQUARED; i++) { \
-      Unit Y, I, Q; \
-      \
+#define RGB_2_YIQ(a, b, c)                            \
+  do {                                                \
+    int i;                                            \
+                                                      \
+    for (i = 0; i < NUM_PIXELS_SQUARED; i++) {        \
+      Unit Y, I, Q;                                   \
+                                                      \
       Y = 0.299 * a[i] + 0.587 * b[i] + 0.114 * c[i]; \
       I = 0.596 * a[i] - 0.275 * b[i] - 0.321 * c[i]; \
       Q = 0.212 * a[i] - 0.523 * b[i] + 0.311 * c[i]; \
-      a[i] = Y; \
-      b[i] = I; \
-      c[i] = Q; \
-    } \
-  } while(0)
+      a[i] = Y;                                       \
+      b[i] = I;                                       \
+      c[i] = Q;                                       \
+    }                                                 \
+  } while (0)
 
 #if 0
 /* Haar 2D transform.
@@ -149,8 +149,7 @@ haar2D(Unit a[])
 // Here input is RGB data [0..255] in Unit arrays
 // Computation is (almost) in-situ.
 static void
-haar2D(Unit a[])
-{
+haar2D(Unit a[]) {
   int i;
   Unit t[NUM_PIXELS >> 1];
 
@@ -168,19 +167,19 @@ haar2D(Unit a[])
     for (h = NUM_PIXELS; h > 1; h = h1) {
       int j1, j2, k;
 
-      h1 = h >> 1;		// h = 2*h1
-      C *= 0.7071;		// 1/sqrt(2)
+      h1 = h >> 1; // h = 2*h1
+      C *= 0.7071; // 1/sqrt(2)
       for (k = 0, j1 = j2 = i; k < h1; k++, j1++, j2 += 2) {
-        int j21 = j2+1;
+        int j21 = j2 + 1;
 
-        t[k]  = (a[j2] - a[j21]) * C;
+        t[k] = (a[j2] - a[j21]) * C;
         a[j1] = (a[j2] + a[j21]);
       }
       // Write back subtraction results:
-      memcpy(a+i+h1, t, h1*sizeof(a[0]));
+      memcpy(a + i + h1, t, h1 * sizeof(a[0]));
     }
     // Fix first element of each row:
-    a[i] *= C;	// C = 1/sqrt(NUM_PIXELS)
+    a[i] *= C; // C = 1/sqrt(NUM_PIXELS)
   }
 
   // scale by 1/sqrt(128) = 0.08838834764831843:
@@ -198,17 +197,17 @@ haar2D(Unit a[])
       int j1, j2, k;
 
       h1 = h >> 1;
-      C *= 0.7071;		// 1/sqrt(2) = 0.7071
+      C *= 0.7071; // 1/sqrt(2) = 0.7071
       for (k = 0, j1 = j2 = i; k < h1;
-	   k++, j1 += NUM_PIXELS, j2 += 2*NUM_PIXELS) {
-        int j21 = j2+NUM_PIXELS;
+           k++, j1 += NUM_PIXELS, j2 += 2 * NUM_PIXELS) {
+        int j21 = j2 + NUM_PIXELS;
 
-        t[k]  = (a[j2] - a[j21]) * C;
+        t[k] = (a[j2] - a[j21]) * C;
         a[j1] = (a[j2] + a[j21]);
       }
       // Write back subtraction results:
-      for (k = 0, j1 = i+h1*NUM_PIXELS; k < h1; k++, j1 += NUM_PIXELS)
-        a[j1]=t[k];
+      for (k = 0, j1 = i + h1 * NUM_PIXELS; k < h1; k++, j1 += NUM_PIXELS)
+        a[j1] = t[k];
     }
     // Fix first element of each column:
     a[i] *= C;
@@ -222,9 +221,7 @@ haar2D(Unit a[])
    Fully inplace calculation; order of result is interleaved though,
    but we don't care about that.
 */
-void
-transform(Unit* a, Unit* b, Unit* c)
-{
+void transform(Unit *a, Unit *b, Unit *c) {
   RGB_2_YIQ(a, b, c);
 
   haar2D(a);
@@ -240,10 +237,8 @@ transform(Unit* a, Unit* b, Unit* c)
 // Do the Haar tensorial 2d transform itself.
 // Here input RGB data is in unsigned char arrays ([0..255])
 // Results are available in a, b, and c.
-void
-transformChar(unsigned char* c1, unsigned char* c2, unsigned char* c3,
-	      Unit* a, Unit* b, Unit* c)
-{
+void transformChar(unsigned char *c1, unsigned char *c2, unsigned char *c3,
+                   Unit *a, Unit *b, Unit *c) {
   int i;
   Unit *p = a;
   Unit *q = b;
@@ -260,16 +255,15 @@ transformChar(unsigned char* c1, unsigned char* c2, unsigned char* c3,
 // Find the NUM_COEFS largest numbers in cdata[] (in magnitude that is)
 // and store their indices in sig[].
 inline static void
-get_m_largests(Unit *cdata, Idx *sig)
-{
+get_m_largests(Unit *cdata, Idx *sig) {
   int cnt, i;
   valStruct val;
-  valqueue vq;			// dynamic priority queue of valStruct's
+  valqueue vq; // dynamic priority queue of valStruct's
 
   // Could skip i=0: goes into separate avgl
 
   // Fill up the bounded queue. (Assuming NUM_PIXELS_SQUARED > NUM_COEFS)
-  for (i = 1; i < NUM_COEFS+1; i++) {
+  for (i = 1; i < NUM_COEFS + 1; i++) {
     val.i = i;
     val.d = ABS(cdata[i]);
     vq.push(val);
@@ -290,16 +284,16 @@ get_m_largests(Unit *cdata, Idx *sig)
   }
 
   // Empty the (non-empty) queue and fill-in sig:
-  cnt=0;
+  cnt = 0;
   do {
     int t;
 
     val = vq.top();
-    t = (cdata[val.i] <= 0);	/* t = 0 if pos else 1 */
+    t = (cdata[val.i] <= 0); /* t = 0 if pos else 1 */
     /* i - 0 ^ 0 = i; i - 1 ^ 0b111..1111 = 2-compl(i) = -i */
     sig[cnt++] = (val.i - t) ^ -t; // never 0
     vq.pop();
-  } while(!vq.empty());
+  } while (!vq.empty());
   // Must have cnt==NUM_COEFS here.
 }
 
@@ -308,13 +302,11 @@ get_m_largests(Unit *cdata, Idx *sig)
 // coordinates in sig1, sig2, and sig3. avgl are the [0,0] values.
 // The order of occurrence of the coordinates in sig doesn't matter.
 // Complexity is 3 x NUM_PIXELS^2 x 2log(NUM_COEFS).
-int
-calcHaar(Unit *cdata1, Unit *cdata2, Unit *cdata3,
-	 Idx *sig1, Idx *sig2, Idx *sig3, double *avgl)
-{
-  avgl[0]=cdata1[0];
-  avgl[1]=cdata2[0];
-  avgl[2]=cdata3[0];
+int calcHaar(Unit *cdata1, Unit *cdata2, Unit *cdata3,
+             Idx *sig1, Idx *sig2, Idx *sig3, double *avgl) {
+  avgl[0] = cdata1[0];
+  avgl[1] = cdata2[0];
+  avgl[2] = cdata3[0];
 
   // Color channel 1:
   get_m_largests(cdata1, sig1);
