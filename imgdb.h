@@ -34,13 +34,7 @@
 #include <map>
 #include <stdexcept>
 #include <vector>
-
-// unordered_map may still be in TR1
-#if defined(HAVE_UNORDERED_MAP)
 #include <unordered_map>
-#elif defined(HAVE_TR1_UNORDERED_MAP)
-#include <tr1/unordered_map>
-#endif
 
 // Haar transform defines
 #include "haar.h"
@@ -213,19 +207,9 @@ typedef std::vector<imageId> imageId_list;
 typedef std::vector<image_info> image_info_list;
 typedef Idx sig_t[NUM_COEFS];
 
-#if defined(HAVE_UNORDERED_MAP)
 template<typename T>
 class imageIdMap : public std::unordered_map<imageId, T> {
 };
-#elif defined(HAVE_TR1_UNORDERED_MAP)
-template<typename T>
-class imageIdMap : public std::tr1::unordered_map<imageId, T> {
-};
-#else
-template<typename T>
-class imageIdMap : public std::map<imageId, T> {
-};
-#endif
 
 struct ImgData {
 	imageId id;			/* picture id */

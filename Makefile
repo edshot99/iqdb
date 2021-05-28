@@ -21,12 +21,8 @@ IMG_LIB=GD
 # method of storing the image index internally (in simple mode).
 override DEFS+=-DUSE_DELTA_QUEUE
 
-# Set this if you have a C++11 compatible compiler with std::unordered_map
-override DEFS+=-DHAVE_UNORDERED_MAP
 # For GCC the C++11 support also needs to be enabled explicitly
 override DEFS+=-std=c++11
-# If your compiler is older and has std::tr1::unordered_map use this
-# override DEFS+=-DHAVE_TR1_UNORDERED_MAP
 
 # This may help or hurt performance. Try it and see for yourself.
 override DEFS+=-fomit-frame-pointer
