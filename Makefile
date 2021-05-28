@@ -31,9 +31,6 @@ override DEFS+=-std=c++11
 # This may help or hurt performance. Try it and see for yourself.
 override DEFS+=-fomit-frame-pointer
 
-# Force use of a platform independent 64-bit database format.
-override DEFS+=-DFORCE_64BIT
-
 # By default iqdb uses integer math for the similarity computation,
 # because it is often slightly faster than floating point math
 # (and iqdb cannot make use of SSE et.al.) You can remove this option

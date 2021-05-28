@@ -74,7 +74,6 @@ as format specifier, e.g. printf("%08" FMT_imageId, id).
 
 
 // Global typedefs and consts.
-#ifdef FORCE_64BIT
 typedef uint64_t imageId;
 typedef uint64_t count_t;
 typedef uint64_t offset_t;
@@ -88,17 +87,6 @@ typedef int64_t  res_t;
 #define FMT_count_t PRIu64
 #define FMT_offset_t PRIu64
 #define FMT_res_t PRId64
-#else
-typedef unsigned long int imageId;
-typedef size_t count_t;
-typedef off_t offset_t;
-typedef int res_t;
-
-#define FMT_imageId "lx"
-#define FMT_count_t "zu"
-#define FMT_offset_t "llu"
-#define FMT_res_t "d"
-#endif
 
 // Exceptions.
 class base_error : public std::exception {
