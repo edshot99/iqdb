@@ -25,7 +25,10 @@ override DEFS+=-pthread
 
 all:	iqdb test-iqdb
 
-.PHONY: clean
+.PHONY: clean docker
+
+docker:
+	git archive HEAD | docker build - -t iqdb -f Dockerfile
 
 clean:
 	rm -f *.o vendor/*.o iqdb test
