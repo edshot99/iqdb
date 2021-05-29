@@ -21,6 +21,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <string>
+#include <csignal>
 
 #define DEBUG_IQDB
 #include "debug.h"

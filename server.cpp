@@ -30,6 +30,7 @@
 #include "vendor/json.hpp"
 
 using nlohmann::json;
+using httplib::Server;
 
 extern int debug_level;
 
@@ -67,10 +68,30 @@ private:
 #define ScD(x) (x)
 #endif
 
+static Server server;
+
+void install_signal_handlers() {
+  struct sigaction action = {};
+  sigfillset(&action.sa_mask);
+  action.sa_flags = SA_RESTART;
+
+  action.sa_handler = [](int) {
+    if (server.is_running()) {
+      server.stop();
+    }
+  };
+
+  sigaction(SIGINT, &action, NULL);
+  sigaction(SIGTERM, &action, NULL);
+}
+
 void http_server(const std::string host, const int port, const std::string database_filename) {
-  httplib::Server server;
+  DEBUG(summary)("Starting server...\n");
+
   dbSpaceAuto memory_db(database_filename.c_str(), imgdb::dbSpace::mode_simple);
   dbSpaceAuto file_db(database_filename.c_str(), imgdb::dbSpace::mode_alter);
+
+  install_signal_handlers();
 
   server.Post("/images/(\\d+)", [&](const auto &request, auto &response) {
     if (!request.has_file("file"))
@@ -162,6 +183,7 @@ void http_server(const std::string host, const int port, const std::string datab
 
   DEBUG(summary)("Listening on %s:%i.\n", host.c_str(), port);
   server.listen(host.c_str(), port);
+  DEBUG(summary)("Stopping server...\n");
 }
 
 void help() {
