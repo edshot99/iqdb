@@ -32,10 +32,13 @@ clean:
 
 %.o : %.h
 %.o : %.cpp
-iqdb.o : imgdb.h haar.h auto_clean.h debug.h
+iqdb.o : debug.h imgdb.h server.h
 imgdb.o : imgdb.h imglib.h haar.h auto_clean.h delta_queue.h debug.h
+server.o : auto_clean.h debug.h imgdb.h vendor/httplib.h vendor/json.hpp
 test-db.o : imgdb.h delta_queue.h debug.h
 haar.o :
+debug.o :
+resizer.o :
 vendor/httplib.o : vendor/httplib.h
 %.le.o : %.h
 iqdb.le.o : imgdb.h haar.h auto_clean.h debug.h
@@ -48,7 +51,7 @@ IMG_libs = $(shell pkg-config --libs gdlib libjpeg libpng)
 IMG_flags = $(shell pkg-config --cflags gdlib libjpeg libpng)
 IMG_objs = resizer.o
 
-% : %.o haar.o imgdb.o debug.o vendor/httplib.o ${IMG_objs}
+% : %.o haar.o imgdb.o debug.o server.o vendor/httplib.o ${IMG_objs}
 	g++ -o $@ $^ ${CFLAGS} ${LDFLAGS} ${IMG_libs} ${DEFS}
 
 %.o : %.cpp
