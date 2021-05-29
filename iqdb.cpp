@@ -42,45 +42,12 @@ int main(int argc, char **argv) {
       argc--;
     }
 
-    const char *filename = argv[2]; int flags = 0;
-
-    if (!strcasecmp(argv[1], "add")) {
-      add(filename);
-    } else if (!strcasecmp(argv[1], "list")) {
-      list(filename);
-    } else if (!strncasecmp(argv[1], "query", 5)) {
-      if (argv[1][5] == 'u')
-        flags |= imgdb::dbSpace::flag_uniqueset;
-
-      const char *img = argv[3];
-      int numres = argc < 6 ? -1 : strtol(argv[4], NULL, 0);
-      if (numres < 1)
-        numres = 16;
-      query(filename, img, numres, flags);
-    } else if (!strcasecmp(argv[1], "sim")) {
-      imgdb::imageId id = strtoll(argv[3], NULL, 0);
-      int numres = argc < 6 ? -1 : strtol(argv[4], NULL, 0);
-      if (numres < 1)
-        numres = 16;
-      sim(filename, id, numres);
-    } else if (!strcasecmp(argv[1], "rehash")) {
-      rehash(filename);
-    } else if (!strcasecmp(argv[1], "command")) {
-      command(argc - 2, argv + 2);
-    } else if (!strcasecmp(argv[1], "listen")) {
-      server(argv[2], argc - 3, argv + 3, false);
-    } else if (!strcasecmp(argv[1], "listen2")) {
-      server(argv[2], argc - 3, argv + 3, true);
-    } else if (!strcasecmp(argv[1], "http")) {
+    if (!strcasecmp(argv[1], "http")) {
       const std::string host = argc >= 2 ? argv[2] : "localhost";
       const int port = argc >= 3 ? std::stoi(argv[3]) : 8000;
       const std::string filename = argc >= 4 ? argv[4] : "iqdb.db";
 
       http_server(host, port, filename);
-    } else if (!strcasecmp(argv[1], "statistics")) {
-      stats(filename);
-    } else if (!strcasecmp(argv[1], "count")) {
-      count(filename);
     } else {
       help();
     }

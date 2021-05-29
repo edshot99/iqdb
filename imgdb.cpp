@@ -280,21 +280,6 @@ void imageIdIndex_list<true, true>::set_base() {
   }
 }
 
-int dbSpace::mode_from_name(const char *mode_name) {
-  if (!strcmp(mode_name, "normal"))
-    return imgdb::dbSpace::mode_normal;
-  else if (!strcmp(mode_name, "readonly"))
-    return imgdb::dbSpace::mode_readonly;
-  else if (!strcmp(mode_name, "simple"))
-    return imgdb::dbSpace::mode_simple;
-  else if (!strcmp(mode_name, "alter"))
-    return imgdb::dbSpace::mode_alter;
-  else if (!strcmp(mode_name, "imgdata"))
-    return imgdb::dbSpace::mode_imgdata;
-  else
-    throw param_error("Unknown mode name.");
-}
-
 // Specializations accessing images as SigStruct* or size_t map, and imageIdIndex_map as imageId or index map.
 template <>
 inline dbSpaceImpl<false>::imageIterator dbSpaceImpl<false>::image_begin() { return imageIterator(m_images.begin(), *this); }
@@ -612,37 +597,6 @@ void dbSpace::imgDataFromBlob(const void *data, size_t data_size, imageId id, Im
   return dbSpaceCommon::imgDataFromBlob(data, data_size, id, img);
 }
 
-template <>
-void dbSpaceImpl<false>::setImageRes(imageId id, int width, int height) {
-  imageIterator itr = find(id);
-  ImgData sig;
-  read_sig_cache(itr.cOfs(), &sig);
-  sig.width = width;
-  sig.height = height;
-  write_sig_cache(itr.cOfs(), &sig);
-}
-
-template <>
-void dbSpaceImpl<true>::setImageRes(imageId id, int width, int height) {
-  imageIterator itr = find(id);
-  itr->width = width;
-  itr->height = height;
-}
-
-void dbSpaceAlter::setImageRes(imageId id, int width, int height) {
-  if (m_readonly)
-    throw usage_error("Not possible in imgdata mode.");
-
-  size_t ind = find(id)->second;
-  ImgData sig = get_sig(ind);
-  m_f->seekg(m_sigOff + ind * sizeof(ImgData));
-  m_f->read(&sig);
-  sig.width = width;
-  sig.height = height;
-  m_f->seekp(m_sigOff + ind * sizeof(ImgData));
-  m_f->write(sig);
-}
-
 template <bool is_simple>
 void dbSpaceImpl<is_simple>::load(const char *filename) {
   db_ifstream f(filename);
@@ -861,12 +815,6 @@ void dbSpaceImpl<false>::save_file(const char *filename) {
 
 template <>
 void dbSpaceImpl<true>::save_file(const char *filename) { throw usage_error("Can't save read-only db."); }
-
-struct in_deleted_tail : public std::unary_function<size_t, bool> {
-  in_deleted_tail(size_t max) : m_max(max) {}
-  bool operator()(size_t ind) { return ind < m_max; }
-  size_t m_max;
-};
 
 // Relocate sigs from the end into the holes left by deleted images.
 void dbSpaceAlter::move_deleted() {
@@ -1334,18 +1282,6 @@ size_t dbSpaceAlter::getImgCount() {
 }
 
 template <bool is_simple>
-stats_t dbSpaceImpl<is_simple>::getCoeffStats() {
-  stats_t ret;
-  ret.reserve(imgbuckets.count());
-
-  for (typename buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr) {
-    ret.push_back(std::make_pair(itr - imgbuckets.begin(), itr->size()));
-  }
-
-  return ret;
-}
-
-template <bool is_simple>
 imageId_list dbSpaceImpl<is_simple>::getImgIdList() {
   imageId_list ids;
 
@@ -1366,20 +1302,6 @@ imageId_list dbSpaceAlter::getImgIdList() {
 
   return ids;
 }
-
-template <>
-image_info_list dbSpaceImpl<false>::getImgInfoList() {
-  image_info_list info;
-
-  // TODO is there a faster way for getting a maps key list and returning a vector from it ?
-  for (imageIterator it = image_begin(); it != image_end(); ++it) {
-    info.push_back(image_info(it.id(), it.avgl(), it.width(), it.height()));
-  }
-
-  return info;
-}
-template <>
-image_info_list dbSpaceImpl<true>::getImgInfoList() { return m_info; }
 
 dbSpace::dbSpace() {}
 dbSpace::~dbSpace() {}

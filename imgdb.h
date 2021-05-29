@@ -206,7 +206,6 @@ struct image_info {
 };
 
 typedef std::vector<sim_value> sim_vector;
-typedef std::vector<std::pair<uint32_t, size_t>> stats_t;
 typedef std::vector<imageId> imageId_list;
 typedef std::vector<image_info> image_info_list;
 typedef Idx sig_t[NUM_COEFS];
@@ -292,8 +291,6 @@ public:
   static const int flags_internal = 0xff000000;
   static const int flag_mask = 0x10000000; // Use AND and XOR masks, and only return image if result is zero.
 
-  static int mode_from_name(const char *mode);
-
   static dbSpace *load_file(const char *filename, int mode);
   virtual void save_file(const char *filename) = 0;
 
@@ -312,19 +309,16 @@ public:
 
   // Stats.
   virtual size_t getImgCount() = 0;
-  virtual stats_t getCoeffStats() = 0;
   virtual bool hasImage(imageId id) = 0;
   virtual int getImageHeight(imageId id) = 0;
   virtual int getImageWidth(imageId id) = 0;
   virtual bool isImageGrayscale(imageId id) = 0;
   virtual imageId_list getImgIdList() = 0;
-  virtual image_info_list getImgInfoList() = 0;
 
   // DB maintenance.
   virtual void addImage(imageId id, const char *filename) = 0;
   virtual void addImageBlob(imageId id, const void *blob, size_t length) = 0;
   virtual void addImageData(const ImgData *img) = 0;
-  virtual void setImageRes(imageId id, int width, int height) = 0;
 
   virtual void removeImage(imageId id) = 0;
   virtual void rehash() = 0;

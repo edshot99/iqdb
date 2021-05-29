@@ -496,16 +496,13 @@ public:
 
   // Stats.
   virtual size_t getImgCount();
-  virtual stats_t getCoeffStats();
   virtual bool hasImage(imageId id);
   virtual int getImageHeight(imageId id);
   virtual int getImageWidth(imageId id);
   virtual imageId_list getImgIdList();
-  virtual image_info_list getImgInfoList();
 
   // DB maintenance.
   virtual void addImageData(const ImgData *img);
-  virtual void setImageRes(imageId id, int width, int height);
 
   virtual void removeImage(imageId id);
   virtual void rehash();
@@ -583,16 +580,13 @@ public:
 
   // Stats. Partially unsupported.
   virtual size_t getImgCount();
-  virtual stats_t getCoeffStats() { throw usage_error("Not supported in alter mode."); }
   virtual bool hasImage(imageId id);
   virtual int getImageHeight(imageId id);
   virtual int getImageWidth(imageId id);
   virtual imageId_list getImgIdList();
-  virtual image_info_list getImgInfoList() { throw usage_error("Not supported in alter mode."); }
 
   // DB maintenance.
   virtual void addImageData(const ImgData *img);
-  virtual void setImageRes(imageId id, int width, int height);
 
   virtual void removeImage(imageId id);
   virtual void rehash();
