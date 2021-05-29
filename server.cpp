@@ -718,6 +718,25 @@ void http_server(const std::string host, const int port, const std::string datab
     response.set_content(data.dump(4), "application/json");
   });
 
+  server.Delete("/images/(\\d+)", [&](const auto &request, auto &response) {
+    const imgdb::imageId post_id = std::stoi(request.matches[1]);
+
+    if (memory_db->hasImage(post_id)) {
+      memory_db->removeImage(post_id);
+    }
+
+    if (file_db->hasImage(post_id)) {
+      file_db->removeImage(post_id);
+      file_db.save();
+    }
+
+    json data = {
+      { "id", post_id },
+    };
+
+    response.set_content(data.dump(4), "application/json");
+  });
+
   server.Post("/query", [&](const auto &request, auto &response) {
     int limit = 10;
     const int flags = 0;
