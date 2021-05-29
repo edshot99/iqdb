@@ -691,6 +691,32 @@ void server(const char *hostport, int numfiles, char **files, bool listen2) {
 void http_server(const std::string host, const int port, const std::string database_filename) {
   httplib::Server server;
   dbSpaceAuto memory_db(database_filename.c_str(), imgdb::dbSpace::mode_simple);
+  dbSpaceAuto file_db(database_filename.c_str(), imgdb::dbSpace::mode_alter);
+
+  server.Post("/images/(\\d+)", [&](const auto &request, auto &response) {
+    if (!request.has_file("file"))
+      throw imgdb::param_error("`POST /images/:id` requires a `file` param");
+
+    const imgdb::imageId post_id = std::stoi(request.matches[1]);
+    if (memory_db->hasImage(post_id))
+      throw imgdb::duplicate_id("Image already in database.");
+
+    const auto &file = request.get_file_value("file");
+    imgdb::ImgData signature;
+    memory_db->imgDataFromBlob(file.content.c_str(), file.content.size() - 1, post_id, &signature);
+    memory_db->addImageData(&signature);
+
+    file_db->addImageData(&signature);
+    file_db.save();
+
+    json data = {
+      { "id", signature.id },
+      { "width", signature.width },
+      { "height", signature.height },
+    };
+
+    response.set_content(data.dump(4), "application/json");
+  });
 
   server.Post("/query", [&](const auto &request, auto &response) {
     int limit = 10;
