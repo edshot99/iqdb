@@ -20,6 +20,7 @@
 
 #include <cstring>
 #include <cstdlib>
+#include <string>
 
 #define DEBUG_IQDB
 #include "debug.h"
@@ -71,7 +72,11 @@ int main(int argc, char **argv) {
     } else if (!strcasecmp(argv[1], "listen2")) {
       server(argv[2], argc - 3, argv + 3, true);
     } else if (!strcasecmp(argv[1], "http")) {
-      http_server("localhost", 8000, "iqdb.db");
+      const std::string host = argc >= 2 ? argv[2] : "localhost";
+      const int port = argc >= 3 ? std::stoi(argv[3]) : 8000;
+      const std::string filename = argc >= 4 ? argv[4] : "iqdb.db";
+
+      http_server(host, port, filename);
     } else if (!strcasecmp(argv[1], "statistics")) {
       stats(filename);
     } else if (!strcasecmp(argv[1], "count")) {

@@ -794,5 +794,5 @@ void help() {
          "\tdiff dbfile id1 id2 - Compute difference between image IDs.\n"
          "\tlisten [host:]port dbfile... - Listen on given host/port.\n"
          "\thelp - Show this help.\n");
-  exit(1);
+  exit(0);
 }

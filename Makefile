@@ -23,12 +23,12 @@ override DEFS+=-pthread
 
 .SUFFIXES:
 
-all:	iqdb
+all:	iqdb test-iqdb
 
 .PHONY: clean
 
 clean:
-	rm -f *.o vendor/*.o iqdb
+	rm -f *.o vendor/*.o iqdb test
 
 %.o : %.h
 %.o : %.cpp
@@ -39,6 +39,7 @@ test-db.o : imgdb.h delta_queue.h debug.h
 haar.o :
 debug.o :
 resizer.o :
+test-iqdb.o : server.h vendor/httplib.h vendor/json.hpp
 vendor/httplib.o : vendor/httplib.h
 %.le.o : %.h
 iqdb.le.o : imgdb.h haar.h auto_clean.h debug.h
