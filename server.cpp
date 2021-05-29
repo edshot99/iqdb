@@ -774,6 +774,13 @@ void http_server(const std::string host, const int port, const std::string datab
     DEBUG(summary)("%s \"%s %s %s\" %d %zd\n", req.remote_addr.c_str(), req.method.c_str(), req.path.c_str(), req.version.c_str(), res.status, res.body.size());
   });
 
+  server.set_exception_handler([](const auto& req, auto& res, std::exception &e) {
+    json data = { { "message", e.what() } };
+
+    res.set_content(data.dump(4), "application/json");
+    res.status = 500;
+  });
+
   DEBUG(summary)("Listening on %s:%i.\n", host.c_str(), port);
   server.listen(host.c_str(), port);
 }
