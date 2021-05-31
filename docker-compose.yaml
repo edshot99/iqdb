@@ -1,0 +1,22 @@
+version: "3.4"
+
+services:
+  iqdb:
+    image: "${IQDB_IMAGE:-evazion/iqdb}"
+    build: .
+    volumes:
+      - "iqdb-data:/iqdb/data"
+    command: ["http", "0.0.0.0", "5588", "/iqdb/data/iqdb.db"]
+  nginx:
+    image: nginx
+    ports:
+      - "80:80"
+    secrets:
+      - "nginx.conf"
+    entrypoint: ["nginx", "-c", "/run/secrets/nginx.conf"]
+volumes:
+  iqdb-data:
+    name: iqdb-data
+secrets:
+  nginx.conf:
+    file: nginx.conf
