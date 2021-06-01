@@ -2,17 +2,16 @@ FROM ubuntu:20.10 AS build
 WORKDIR /iqdb
 RUN \
   apt-get update && \
-  apt-get install --yes --no-install-recommends build-essential g++ libgd-dev libjpeg-dev libpng-dev
+  apt-get install --yes --no-install-recommends build-essential cmake libgd-dev 
 COPY . ./
-RUN make -j "$(nproc)"
+RUN make release
 
 FROM ubuntu:20.10
 WORKDIR /iqdb
 RUN \
   apt-get update && \
-  apt-get install --yes --no-install-recommends libgd3 libjpeg-turbo8 libpng16-16
-COPY --from=build /iqdb ./
-RUN ln -t /usr/local/bin ./iqdb ./test-iqdb
+  apt-get install --yes --no-install-recommends libgd3
+COPY --from=build /iqdb/build/release/iqdb /usr/local/bin/
 
 EXPOSE 5588
 ENTRYPOINT ["iqdb"]
