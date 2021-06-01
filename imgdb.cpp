@@ -904,9 +904,8 @@ struct sim_result : public index_iterator<is_simple>::base_type {
 };
 
 template <bool is_simple>
-inline bool dbSpaceImpl<is_simple>::skip_image(const imageIterator &itr, const queryArg &query) {
-  return (is_simple && !itr.avgl().v[0]) ||
-         ((query.flags & flag_mask) && ((itr.mask() & query.mask_and) != query.mask_xor));
+inline bool dbSpaceImpl<is_simple>::skip_image(const imageIterator &itr) {
+  return (is_simple && !itr.avgl().v[0]);
 }
 
 template <bool is_simple>
@@ -914,7 +913,7 @@ template <int num_colors>
 sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
   int c;
   Score scale = 0;
-  int sketch = q.flags & flag_sketch ? 1 : 0;
+  int sketch = 0;
   //fprintf(stderr, is_simple?"In do_query<true%d>.\n":"In do_query<false%d>.\n", num_colors);
 
   if (!m_bucketsValid)
@@ -955,13 +954,15 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
   memset(counts.ptr(), 0, sizeof(counts[0]) * count);
   memset(setcnt, 0, sizeof(setcnt));
 #endif
-  for (int b = (q.flags & flag_fast) ? NUM_COEFS : 0; b < NUM_COEFS; b++) { // for every coef on a sig
+  int flag_fast = 0;
+  int flag_nocommon = 0;
+  for (int b = flag_fast ? NUM_COEFS : 0; b < NUM_COEFS; b++) { // for every coef on a sig
     for (c = 0; c < num_colors; c++) {
       int idx;
       bucket_type &bucket = imgbuckets.at(c, q.sig[c][b], &idx);
       if (bucket.empty())
         continue;
-      if (q.flags & flag_nocommon && bucket.size() > count / 10)
+      if (flag_nocommon && bucket.size() > count / 10)
         continue;
 
       Score weight = weights[sketch][imgBin[idx]][c];
@@ -1012,8 +1013,7 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
 
   // Fill up the numres-bounded priority queue (largest at top):
   while (pqResults.size() < need && itr != image_end()) {
-    //fprintf(stderr, "ID %08lx mask %x qflm %d %x -> %x = %x?\n", itr.id(), itr.mask(), q.flags & flag_mask, q.mask_and, itr.mask() & q.mask_and,q.mask_xor);
-    if (skip_image(itr, q)) {
+    if (skip_image(itr)) {
       ++itr;
       continue;
     }
@@ -1023,7 +1023,8 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
 #endif
     pqResults.push(sim_result<is_simple>(scores[itr.index()], itr));
 
-    if (q.flags & flag_uniqueset) //{
+    int flag_uniqueset = 0;
+    if (flag_uniqueset) //{
       need += ++sets[itr.set()] > 1;
     //imageIterator top(pqResults.top(), *this);fprintf(stderr, "Added id=%08lx score=%.2f set=%x, now need %d. Worst is id %08lx score %.2f set %x has %zd\n", itr.id(), (double)scores[itr.index()]/ScoreMax, itr.set(), need, top.id(), (double)pqResults.top().score/ScoreMax, top.set(), sets[top.set()]); }
     ++itr;
@@ -1032,16 +1033,16 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
   for (; itr != image_end(); ++itr) {
     // only consider if not ignored due to keywords and if is a better match than the current worst match
 #if QUERYSTATS
-    if (!skip_image(itr, q))
+    if (!skip_image(itr))
       setcnt[counts[itr.index()]]++;
 #endif
     if (scores[itr.index()] < pqResults.top().score) {
-      //fprintf(stderr, "ID %08lx mask %x qflm %d %x -> %x = %x?\n", itr.id(), itr.mask(), q.flags & flag_mask, q.mask_and, itr.mask() & q.mask_and,q.mask_xor);
-      if (skip_image(itr, q))
+      if (skip_image(itr))
         continue;
 
       // Make room by dropping largest entry:
-      if (q.flags & flag_uniqueset) {
+      int flag_uniqueset = 0;
+      if (flag_uniqueset) {
         pqResults.push(sim_result<is_simple>(scores[itr.index()], itr));
         need += ++sets[itr.set()] > 1;
         //imageIterator top(pqResults.top(), *this);fprintf(stderr, "Added id=%08lx score=%.2f set=%x, now need %d. Worst is id %08lx score %.2f set %x has %zd\n", itr.id(), (double)scores[itr.index()]/ScoreMax, itr.set(), need, top.id(), (double)pqResults.top().score/ScoreMax, top.set(), sets[top.set()]);
@@ -1068,7 +1069,8 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
 
     imageIterator itr(curResTmp, *this);
     //fprintf(stderr, "Candidate %08lx = %.2f, set %x has %zd.\n", itr.id(), ScD(curResTmp.score), itr.set(), sets[itr.set()]);
-    if (!(q.flags & flag_uniqueset) || sets[itr.set()]-- < 2)
+    int flag_uniqueset = 0;
+    if (!flag_uniqueset || sets[itr.set()]-- < 2)
       V.push_back(sim_value(itr.id(), DScSc(((DScore)curResTmp.score) * 100 * scale), itr.width(), itr.height()));
     //else fprintf(stderr, "Skipped!\n");
     pqResults.pop();
@@ -1095,7 +1097,7 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
 template <bool is_simple>
 inline sim_vector
 dbSpaceImpl<is_simple>::queryImg(const queryArg &query) {
-  if ((query.flags & flag_grayscale) || is_grayscale(query.avgl))
+  if (is_grayscale(query.avgl))
     return do_query<1>(query);
   else
     return do_query<3>(query);

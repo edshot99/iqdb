@@ -511,7 +511,7 @@ private:
 
   virtual void load(const char *filename);
 
-  bool skip_image(const imageIterator &itr, const queryArg &query);
+  bool skip_image(const imageIterator &itr);
 
   imageIterator image_begin();
   imageIterator image_end();

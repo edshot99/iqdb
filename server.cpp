@@ -135,7 +135,6 @@ void http_server(const std::string host, const int port, const std::string datab
 
   server.Post("/query", [&](const auto &request, auto &response) {
     int limit = 10;
-    const int flags = 0;
     json data;
 
     if (!request.has_file("file"))
@@ -145,7 +144,7 @@ void http_server(const std::string host, const int port, const std::string datab
       limit = stoi(request.get_param_value("limit"));
 
     const auto &file = request.get_file_value("file");
-    const imgdb::queryArg query(file.content.c_str(), file.content.size() - 1, limit, flags);
+    const imgdb::queryArg query(file.content.c_str(), file.content.size() - 1, limit);
     const auto matches = memory_db->queryImg(query);
 
     for (const auto &match : matches) {

@@ -229,41 +229,9 @@ class dbSpace;
 class db_ifstream;
 class db_ofstream;
 
-// Non-standard query arguments.
-struct queryOpt {
-  queryOpt(int fl = 0) : flags(fl), mask_and(0), mask_xor(0) {}
-  void mask(uint16_t maskAnd, uint16_t maskXor);
-  void reset();
-
-  int flags;
-
-  uint16_t mask_and;
-  uint16_t mask_xor;
-};
-
 // Standard query arguments.
-struct queryArg : public queryOpt {
-  queryArg(dbSpace *db, imageId id, unsigned int numres, int flags);
-  queryArg(const ImgData &img, unsigned int numres, int flags);
-  queryArg(const void *data, size_t data_size, unsigned int numres, int flags);
-
-  // Chainable modifier functions to set non-standard arguments.
-  queryArg &mask(uint16_t maskAnd, uint16_t maskXor) {
-    queryOpt::mask(maskAnd, maskXor);
-    return *this;
-  }
-
-  // Copy, move and reset non-standard arguments.
-  queryArg &merge(const queryOpt &q);
-  queryArg &coalesce(queryOpt &q) {
-    merge(q);
-    q.reset();
-    return *this;
-  }
-  queryArg &reset() {
-    queryOpt::reset();
-    return *this;
-  }
+struct queryArg {
+  queryArg(const void *data, size_t data_size, unsigned int numres);
 
   sig_t sig[3];
   lumin_native avgl;
@@ -277,18 +245,6 @@ public:
   static const int mode_simple = 0x02;   // Fast queries, less memory, cannot save, no image ID queries.
   static const int mode_alter = 0x04;    // Fast add/remove/info on existing DB file, no queries.
   static const int mode_imgdata = 0x05;  // Similar to mode_alter, but read-only, to retrieve image data.
-
-  // Image query flags.
-  static const int flag_sketch = 0x01;    // Image is a sketch, use adjusted weights.
-  static const int flag_grayscale = 0x02; // Disregard color information from image.
-                                          // unused at the moment	= 0x04;
-  static const int flag_uniqueset = 0x08; // Return only best match from each set.
-  static const int flag_nocommon = 0x10;  // Disregard common coefficients (those which are present in at least 10% of the images).
-  static const int flag_fast = 0x20;      // Check only DC coefficient (luminance).
-
-  // Used internally.
-  static const int flags_internal = 0xff000000;
-  static const int flag_mask = 0x10000000; // Use AND and XOR masks, and only return image if result is zero.
 
   static dbSpace *load_file(const char *filename, int mode);
   virtual void save_file(const char *filename) = 0;
@@ -342,31 +298,10 @@ inline void dbSpace::queryFromImgData(const ImgData &img, queryArg *query) {
   image_info::avglf2i(img.avglf, query->avgl);
 }
 
-inline void queryOpt::mask(uint16_t maskAnd, uint16_t maskXor) {
-  mask_and = maskAnd;
-  mask_xor = maskXor;
-  flags |= dbSpace::flag_mask;
-}
-inline void queryOpt::reset() {
-  mask_and = mask_xor = 0;
-  flags = flags & ~dbSpace::flags_internal;
-}
-inline queryArg::queryArg(dbSpace *db, imageId id, unsigned int nr, int fl) : queryOpt(fl), numres(nr) {
-  db->getImgQueryArg(id, this);
-}
-inline queryArg::queryArg(const ImgData &img, unsigned int nr, int fl) : queryOpt(fl), numres(nr) {
-  dbSpace::queryFromImgData(img, this);
-}
-inline queryArg::queryArg(const void *data, size_t data_size, unsigned int nr, int fl) : queryOpt(fl), numres(nr) {
+inline queryArg::queryArg(const void *data, size_t data_size, unsigned int nr) : numres(nr) {
   ImgData img;
   dbSpace::imgDataFromBlob(data, data_size, 0, &img);
   dbSpace::queryFromImgData(img, this);
-}
-inline queryArg &queryArg::merge(const queryOpt &q) {
-  mask_and = q.mask_and;
-  mask_xor = q.mask_xor;
-  flags = (flags & ~dbSpace::flags_internal) | (q.flags & dbSpace::flags_internal);
-  return *this;
 }
 
 } // namespace imgdb
