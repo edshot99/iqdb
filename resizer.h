@@ -23,40 +23,14 @@
 
 #include "auto_clean.h"
 
-enum image_types { IMG_UNKNOWN,
-                   IMG_JPEG,
-                   IMG_PNG,
-                   IMG_GIF,
-                   IMG_BMP };
-struct image_info {
-  unsigned int width, height;
-  const char *mime_type;
-  image_types type;
-};
-
-struct resizer_result {
-  gdImagePtr image;
-  unsigned int via_x, via_y;
-
-  operator gdImagePtr() { return image; }
-
-  resizer_result(gdImagePtr i) : image(i), via_x(0), via_y(0) {}
-  resizer_result(gdImagePtr i, unsigned int x, unsigned int y) : image(i), via_x(x), via_y(y) {}
-};
+enum image_types { IMG_UNKNOWN, IMG_JPEG };
 
 // Use this to wrap the return code of e.g. resize_image_data
 // to make sure it is always cleaned up, even with exceptions.
 typedef AutoCleanPtrF<gdImage, &gdImageDestroy> AutoGDImage;
 
-// Find type and dimensions from image data, which may be incomplete.
-// Only reads the header, does not do any data validation.
-// Return values:
-// 0   Success, image_info structure now holds valid information.
-//     (Note that the type may still be IMG_UNKNOWN.)
-// >0  Cannot determine type, need at this many more bytes before
-//     more information may be available.
-size_t get_image_info(const unsigned char *data, size_t length, image_info *info);
+image_types get_image_info(const unsigned char *data, size_t length);
 
 // Take image data at given memory location and length, and resize
 // to thu_x*thu_y and return it.
-resizer_result resize_image_data(const unsigned char *data, size_t len, unsigned int thu_x, unsigned int thu_y);
+gdImage* resize_image_data(const unsigned char *data, size_t len, unsigned int thu_x, unsigned int thu_y);

@@ -553,23 +553,12 @@ void dbSpaceAlter::addImageData(const ImgData *img) {
 }
 
 void dbSpaceCommon::addImageBlob(imageId id, const void *blob, size_t length) {
-  if (hasImage(id)) // image already in db
-    throw duplicate_id("Image already in database.");
-
-  ::image_info info;
-  get_image_info((const unsigned char *)blob, length, &info);
-
-  AutoGDImage image(resize_image_data((const unsigned char *)blob, length, NUM_PIXELS, NUM_PIXELS));
-
   ImgData sig;
-  sigFromImage(image, id, &sig);
+  imgDataFromBlob(blob, length, id, &sig);
   return addImageData(&sig);
 }
 
 void dbSpaceCommon::imgDataFromBlob(const void *data, size_t data_size, imageId id, ImgData *img) {
-  ::image_info info;
-  get_image_info((const unsigned char *)data, data_size, &info);
-
   AutoGDImage image(resize_image_data((const unsigned char *)data, data_size, NUM_PIXELS, NUM_PIXELS));
   sigFromImage(image, id, img);
 }
