@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unordered_map>
+#include <fstream>
+#include <streambuf>
 
 int debug_level = DEBUG_errors | DEBUG_base | DEBUG_summary | DEBUG_resizer | DEBUG_image_info;
 
@@ -170,7 +172,9 @@ int main() {
   DeltaTest::test();
 
   deleted_t removed;
-  imgdb::dbSpace::imgDataFromFile("test.jpg", 0, &org);
+  std::ifstream file("files/1.jpg");
+  std::string image((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  imgdb::dbSpace::imgDataFromBlob(image.data(), image.size() - 1, 0, &org);
   fprintf(stderr, "test.jpg avgl: %f %f %f\n", org.avglf[0], org.avglf[1], org.avglf[2]);
   if (!org.avglf[0] || !org.avglf[1] || !org.avglf[2]) {
     DEBUG(errors)("Image loading failed!\n");

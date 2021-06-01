@@ -188,10 +188,6 @@ public:
     if (num > m_base.size())
       m_tail.reserve(num - m_base.size());
   }
-  void loaded(size_t num) {
-    if (num != m_tail.size())
-      throw data_error("Loaded incorrect number.");
-  }
   void set_base();
   void push_back(image_id_index i) { m_tail.push_back(i.index); }
   void remove(image_id_index i); // unimplemented.
@@ -226,11 +222,6 @@ public:
   size_t size() { return m_size + m_tail.size(); }
   void reserve(size_t num) { resize(num); }
   void resize(size_t num);
-  void loaded(size_t num) {
-    if (num > m_capacity)
-      throw data_error("Loaded too many.");
-    m_size = num;
-  }
   void set_base() {}
   void push_back(image_id_index i) {
     m_tail.push_back(i);
@@ -287,8 +278,6 @@ public:
 template <bool is_simple>
 class dbSpaceImpl;
 
-inline Score get_aspect(int width, int height) { return 0; }
-
 template <bool is_simple>
 class sigMap;
 
@@ -324,7 +313,6 @@ struct index_iterator<false> : public sigMap<false>::iterator {
   uint16_t set() const { return sig()->set; }
   uint16_t mask() const { return sig()->mask; }
   size_t cOfs() const { return sig()->cacheOfs; }
-  Score asp() const { return get_aspect(sig()->width, sig()->height); }
 };
 
 // In simple mode, we have only the image_info data available, so iterate over that.
@@ -345,7 +333,6 @@ struct index_iterator<true> : public image_info_list::iterator {
   uint16_t set() const { return (*this)->set; }
   uint16_t mask() const { return (*this)->mask; }
   size_t cOfs() const { return index() * sizeof(ImgData); }
-  Score asp() const { return 0; }
 
   dbSpaceImpl<true> &m_db;
 };
@@ -421,10 +408,8 @@ public:
 // Common function used by all implementations.
 class dbSpaceCommon : public dbSpace {
 public:
-  virtual void addImage(imageId id, const char *filename);
   virtual void addImageBlob(imageId id, const void *blob, size_t length);
 
-  static void imgDataFromFile(const char *filename, imageId id, ImgData *img);
   static void imgDataFromBlob(const void *data, size_t data_size, imageId id, ImgData *img);
 
   static bool is_grayscale(const lumin_native &avgl);
@@ -627,14 +612,7 @@ private:
   bool m_readonly;
 };
 
-/* signature structure */
-static const unsigned int AVG_IMGS_PER_DBSPACE = 20000;
-
 // Serialization constants
-static const unsigned int SRZ_V0_5_1 = 1;
-static const unsigned int SRZ_V0_6_0 = 2;
-static const unsigned int SRZ_V0_6_1 = 3;
-static const unsigned int SRZ_V0_7_0 = 8;
 static const unsigned int SRZ_V0_9_0 = 9;
 
 // Variable size and endianness check

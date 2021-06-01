@@ -566,31 +566,12 @@ void dbSpaceCommon::addImageBlob(imageId id, const void *blob, size_t length) {
   return addImageData(&sig);
 }
 
-void dbSpaceCommon::imgDataFromFile(const char *filename, imageId id, ImgData *img) {
-  AutoClean<mapped_file, &mapped_file::unmap> map(mapped_file(filename, false));
-  AutoGDImage image(resize_image_data((const unsigned char *)map.m_base, map.m_length, NUM_PIXELS, NUM_PIXELS));
-  sigFromImage(image, id, img);
-}
-
 void dbSpaceCommon::imgDataFromBlob(const void *data, size_t data_size, imageId id, ImgData *img) {
   ::image_info info;
   get_image_info((const unsigned char *)data, data_size, &info);
 
   AutoGDImage image(resize_image_data((const unsigned char *)data, data_size, NUM_PIXELS, NUM_PIXELS));
   sigFromImage(image, id, img);
-}
-
-void dbSpaceCommon::addImage(imageId id, const char *filename) {
-  if (hasImage(id)) // image already in db
-    throw duplicate_id("Image already in database.");
-
-  ImgData sig;
-  imgDataFromFile(filename, id, &sig);
-  return addImageData(&sig);
-}
-
-void dbSpace::imgDataFromFile(const char *filename, imageId id, ImgData *img) {
-  return dbSpaceCommon::imgDataFromFile(filename, id, img);
 }
 
 void dbSpace::imgDataFromBlob(const void *data, size_t data_size, imageId id, ImgData *img) {
@@ -710,7 +691,7 @@ void dbSpaceAlter::load(const char *filename) {
       throw data_error("Database incompatible with this system");
     }
 
-    if (version != SRZ_V0_7_0 && version != SRZ_V0_9_0)
+    if (version != SRZ_V0_9_0)
       throw data_error("Only current version is supported in alter mode, upgrade first using normal mode.");
 
     DEBUG(imgdb)("Loading db header (cur ver)... ");
@@ -748,7 +729,7 @@ static inline dbSpace *make_dbSpace(int mode) {
              : mode & dbSpaceCommon::mode_mask_simple
                    ? static_cast<dbSpace *>(new dbSpaceImpl<true>(mode & dbSpaceCommon::mode_mask_readonly))
                    : static_cast<dbSpace *>(new dbSpaceImpl<false>(true));
-};
+}
 
 dbSpace *dbSpace::load_file(const char *filename, int mode) {
   dbSpace *db = make_dbSpace(mode);

@@ -246,7 +246,6 @@ struct queryArg : public queryOpt {
   queryArg(dbSpace *db, imageId id, unsigned int numres, int flags);
   queryArg(const ImgData &img, unsigned int numres, int flags);
   queryArg(const void *data, size_t data_size, unsigned int numres, int flags);
-  queryArg(const char *filename, unsigned int numres, int flags);
 
   // Chainable modifier functions to set non-standard arguments.
   queryArg &mask(uint16_t maskAnd, uint16_t maskXor) {
@@ -300,7 +299,6 @@ public:
   virtual sim_vector queryImg(const queryArg &query) = 0;
 
   // Image data.
-  static void imgDataFromFile(const char *filename, imageId id, ImgData *img);
   static void imgDataFromBlob(const void *data, size_t data_size, imageId id, ImgData *img);
 
   // Initialize sig and avgl of the queryArg.
@@ -316,7 +314,6 @@ public:
   virtual imageId_list getImgIdList() = 0;
 
   // DB maintenance.
-  virtual void addImage(imageId id, const char *filename) = 0;
   virtual void addImageBlob(imageId id, const void *blob, size_t length) = 0;
   virtual void addImageData(const ImgData *img) = 0;
 
@@ -358,11 +355,6 @@ inline queryArg::queryArg(dbSpace *db, imageId id, unsigned int nr, int fl) : qu
   db->getImgQueryArg(id, this);
 }
 inline queryArg::queryArg(const ImgData &img, unsigned int nr, int fl) : queryOpt(fl), numres(nr) {
-  dbSpace::queryFromImgData(img, this);
-}
-inline queryArg::queryArg(const char *filename, unsigned int nr, int fl) : queryOpt(fl), numres(nr) {
-  ImgData img;
-  dbSpace::imgDataFromFile(filename, 0, &img);
   dbSpace::queryFromImgData(img, this);
 }
 inline queryArg::queryArg(const void *data, size_t data_size, unsigned int nr, int fl) : queryOpt(fl), numres(nr) {

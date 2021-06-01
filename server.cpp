@@ -38,10 +38,6 @@ class dbSpaceAuto : public AutoCleanPtr<imgdb::dbSpace> {
 public:
   dbSpaceAuto(){};
   dbSpaceAuto(const char *filename, int mode) : AutoCleanPtr<imgdb::dbSpace>(loaddb(filename, mode)), m_filename(filename){};
-  dbSpaceAuto(const dbSpaceAuto &other) {
-    if (other != NULL)
-      throw imgdb::internal_error("Can't copy-construct dbSpaceAuto.");
-  }
 
   void save() { (*this)->save_file(m_filename.c_str()); }
   void load(const char *filename, int mode) {

@@ -46,18 +46,6 @@
 
 #include <stdexcept>
 
-template <typename T, void (T::*cleanup_func)()>
-class AutoClean : public T {
-public:
-  AutoClean() {}
-  AutoClean(const T &v) : T(v) {}
-  ~AutoClean() { (this->*cleanup_func)(); }
-
-private:
-  AutoClean(const AutoClean &);
-  AutoClean &operator=(const AutoClean &);
-};
-
 template <typename T>
 class AutoCleanPtr {
 public:
@@ -65,24 +53,12 @@ public:
   AutoCleanPtr(T *p) : m_p(p) {}
   ~AutoCleanPtr() { set(NULL); }
 
-  T *set(T *p) {
-    T *old = m_p;
+  void set(T *p) {
     delete m_p;
     m_p = p;
-    return old;
-  }
-  T *detach() {
-    T *old = m_p;
-    m_p = NULL;
-    return old;
   }
 
-  operator T *() { return m_p; }
-  operator const T *() const { return m_p; }
-
-  T &operator*() { return *m_p; }
   T *operator->() { return m_p; }
-  bool operator!() { return !m_p; }
 
 private:
   AutoCleanPtr(const AutoCleanPtr &);
@@ -96,10 +72,6 @@ class AutoCleanPtrF {
 public:
   AutoCleanPtrF() : m_p(NULL) {}
   AutoCleanPtrF(T *p) : m_p(p) {}
-  AutoCleanPtrF(const AutoCleanPtrF &other) : m_p(NULL) {
-    if (other.m_p)
-      throw std::runtime_error("Bad AutoCleanPtrF copy.");
-  }
   ~AutoCleanPtrF() { set(NULL); }
 
   T *set(T *p) {
@@ -116,9 +88,7 @@ public:
   }
 
   operator T *() { return m_p; }
-  operator const T *() const { return m_p; }
 
-  T &operator*() { return *m_p; }
   T *operator->() { return m_p; }
   bool operator!() { return !m_p; }
 
@@ -131,38 +101,15 @@ private:
 template <typename T>
 class AutoCleanArray {
 public:
-  AutoCleanArray() : m_p(NULL) {}
-  AutoCleanArray(T *p) : m_p(p) {}
   explicit AutoCleanArray(size_t count) : m_p(new T[count]) {}
   ~AutoCleanArray() {
     delete[] m_p;
     m_p = NULL;
   }
 
-  T *set(T *p) {
-    T *old = m_p;
-    delete[] m_p;
-    m_p = p;
-    return old;
-  }
-  T *set(size_t count) {
-    T *old = m_p;
-    delete[] m_p;
-    m_p = new T[count];
-    return old;
-  }
-  T *detach() {
-    T *old = m_p;
-    m_p = NULL;
-    return old;
-  }
-  //operator T* () { return m_p; }
   T *ptr() { return m_p; }
 
   T &operator[](size_t ind) { return m_p[ind]; }
-
-  T &operator*() { return *m_p; }
-  T *operator->() { return m_p; }
 
 private:
   AutoCleanArray(const AutoCleanArray &);
