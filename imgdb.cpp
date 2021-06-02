@@ -36,6 +36,7 @@
 /* STL includes */
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <vector>
 
 /* iqdb includes */
@@ -69,19 +70,10 @@ To be treated as a constant.
 unsigned char imgBin[NUM_PIXELS * NUM_PIXELS];
 int imgBinInited = 0;
 
-const static bool is_disk_db = true;
 static size_t pageSize = 0;
 static size_t pageMask = 0;
 static size_t pageImgs = 0;
 static size_t pageImgMask = 0;
-
-mapped_file::mapped_file(const char *fname, bool writable) {
-  int fd = open(fname, writable ? O_RDWR : O_RDONLY);
-  struct stat st;
-  if (fd == -1 || fstat(fd, &st) || (m_base = (unsigned char *)mmap(NULL, m_length = st.st_size, writable ? PROT_READ | PROT_WRITE : PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED)
-    throw image_error("Can't open/stat/map file.");
-  close(fd);
-}
 
 inline void mapped_file::unmap() {
   if (!m_base)
@@ -90,179 +82,7 @@ inline void mapped_file::unmap() {
     DEBUG(errors)("WARNING: Could not unmap %zd bytes of memory.\n", m_length);
 }
 
-int tempfile() {
-  char tempnam[] = "/tmp/imgdb_cache.XXXXXXX";
-  int fd = mkstemp(tempnam);
-  if (fd == -1)
-    throw io_error(std::string("Can't open cache file ") + tempnam + ": " + strerror(errno));
-  if (unlink(tempnam))
-    DEBUG(errors)("WARNING: Can't unlink cache file %s: %s.", tempnam, strerror(errno));
-  return fd;
-}
-
-template <bool is_simple>
-int imageIdIndex_list<is_simple, false>::m_fd = -1;
-
-template <bool is_simple>
-void imageIdIndex_list<is_simple, false>::resize(size_t s) {
-  if (!is_simple)
-    s = (s + pageImgMask) & ~pageImgMask;
-  if (s <= m_capacity)
-    return;
-  if (m_fd == -1)
-    m_fd = tempfile();
-  size_t toadd = s - m_capacity;
-  off_t page = lseek(m_fd, 0, SEEK_CUR);
-  //fprintf(stderr, "%zd/%zd entries at %llx=", toadd, s, page);
-  m_baseofs = page & pageMask;
-  size_t len = toadd * sizeof(imageId);
-  m_capacity += len / sizeof(imageId);
-  if (m_baseofs & (sizeof(imageId) - 1))
-    throw internal_error("Mis-aligned file position.");
-  if (!is_simple && m_baseofs)
-    throw internal_error("Base offset in write mode.");
-  page &= ~pageMask;
-  //fprintf(stderr, "%llx:%zx, %zd bytes=%zd.\n", page, m_baseofs, len, m_capacity);
-  if (ftruncate(m_fd, lseek(m_fd, len, SEEK_CUR)))
-    throw io_error("Failed to resize bucket map file.");
-  m_pages.push_back(imageIdPage(page, len));
-}
-
-template <>
-imageIdIndex_map<true> imageIdIndex_list<true, false>::map_all(bool writable) {
-  //fprintf(stderr, "Mapping... write=%d size=%zd+%zd=%zd/%zd. %zd pages. ", writable, m_size, m_tail.size(), size(), m_capacity, m_pages.size());
-  if (!writable && !size())
-    return imageIdIndex_map<true>();
-  if (!writable && m_pages.empty()) {
-    //fprintf(stderr, "Using fake map of tail data.\n");
-    return imageIdIndex_map<true>();
-  }
-  imageIdPage &page = m_pages.front();
-  size_t length = page.second + m_baseofs;
-  //fprintf(stderr, "Directly mapping %zd bytes. ", length);
-  void *base = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, m_fd, page.first);
-  if (base == MAP_FAILED)
-    throw memory_error("Failed to mmap bucket.");
-  return imageIdIndex_map<true>(base, (size_t *)(((char *)base) + m_baseofs), (size_t *)(((char *)base) + m_baseofs) + m_size, length);
-}
-
-template <>
-imageIdIndex_map<false> imageIdIndex_list<false, false>::map_all(bool writable) {
-  if (!writable && !size())
-    return imageIdIndex_map<false>();
-  if (!writable && m_pages.empty()) {
-    //fprintf(stderr, "Using fake map of tail data.\n");
-    return imageIdIndex_map<false>();
-  }
-
-  while (writable && !m_tail.empty())
-    page_out();
-
-  if (m_baseofs)
-    throw internal_error("Base offset in write mode.");
-  size_t len = m_capacity * sizeof(imageId);
-  len = (len + pageMask) & ~pageMask;
-  //fprintf(stderr, "Making full map of %zd bytes. ", len);
-  void *base = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-  if (base == MAP_FAILED)
-    throw memory_error("Failed to mmap bucket.");
-
-  imageIdIndex_map<false> mapret(base, (image_id_index *)base, (image_id_index *)base + m_capacity, len);
-  char *chunk = (char *)base;
-  for (page_list::iterator itr = m_pages.begin(); itr != m_pages.end(); ++itr) {
-    //fprintf(stderr, "Using %zd bytes from ofs %llx. ", itr->second, (long long int) itr->first);
-    void *map = mmap(chunk, itr->second, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_SHARED, m_fd, itr->first);
-    if (map == MAP_FAILED) {
-      mapret.unmap();
-      throw memory_error("Failed to mmap bucket chunk.");
-    }
-    chunk += itr->second;
-  }
-  return mapret;
-}
-
-template <bool is_simple>
-void imageIdIndex_list<is_simple, false>::page_out() {
-  //fprintf(stderr, "Tail has %zd/%zd values. Capacity %zd. Paging out. ", m_tail.size(), size(), m_capacity);
-  size_t last = m_size & pageImgMask;
-  //fprintf(stderr, "Last page has %zd/%zd(%zd), ", last, m_size, m_capacity);
-  if (!last)
-    resize(size());
-  imageIdPage page = m_pages.back();
-  if (((size() + pageImgMask) & ~pageImgMask) != m_capacity) {
-    //fprintf(stderr, "Need middle page for %zd(%zd)/%zd.", m_size, (size() + pageImgMask) & ~pageImgMask, m_capacity);
-    size_t ofs = last;
-    for (page_list::iterator itr = m_pages.begin(); itr != m_pages.end(); ++itr) {
-      page = *itr;
-      //fprintf(stderr, " %zd@%llx", page.second / sizeof(imageId), (long long int) page.first);
-      while (page.second && m_size > ofs) {
-        ofs += pageImgs;
-        page.first += pageSize;
-        page.second -= pageSize;
-      }
-      if (ofs >= m_size)
-        break;
-    }
-    //fprintf(stderr, " -> %llx = %zd. ", (long long int) page.first, ofs);
-    if (ofs != m_size)
-      throw internal_error("Counted pages badly.");
-  } else {
-    //fprintf(stderr, "map @%llx/%zd. ", (long long int) page.first + page.second - pageSize, page.second);
-    page.first += page.second - pageSize;
-  }
-
-  image_id_index *ptr = (image_id_index *)mmap(NULL, pageSize, PROT_READ | PROT_WRITE, MAP_SHARED, m_fd, page.first);
-  if (ptr == MAP_FAILED)
-    throw memory_error("Failed to map tail page.");
-  size_t copy = std::min(m_tail.size(), pageImgs - last);
-  //fprintf(stderr, "Fits %zd, ", copy);
-  memcpy(ptr + last, &m_tail.front(), copy * sizeof(imageId));
-  m_size += copy;
-  if (copy == m_tail.size()) {
-    m_tail.clear();
-    //fprintf(stderr, "has all. Now %zd.\n", size());
-  } else {
-    m_tail.erase(m_tail.begin(), m_tail.begin() + copy);
-    //fprintf(stderr, "Only fits %zd, %zd left = %zd.\n", copy, m_tail.size(), size());
-  }
-  if (munmap(ptr, pageSize))
-    DEBUG(errors)("WARNING: Failed to munmap tail page.\n");
-}
-
-template <>
-void imageIdIndex_list<false, false>::remove(image_id_index i) {
-  if (!size())
-    return;
-  //fprintf(stderr, "Removing %lx from %zd/%zd(%zd). ", i.id, m_tail.size(), m_size, m_capacity);
-  IdIndex_list::iterator itr = std::find_if(m_tail.begin(), m_tail.end(), std::bind2nd(std::equal_to<image_id_index>(), i));
-  if (itr != m_tail.end()) {
-    //fprintf(stderr, "Found in tail at %d/%zd.\n", itr - m_tail.begin(), m_tail.size());
-    *itr = m_tail.back();
-    m_tail.pop_back();
-    return;
-  }
-  AutoImageIdIndex_map<false> map(map_all(false));
-  imageIdIndex_map<false>::iterator mItr = map.begin();
-  while (mItr != map.end() && *mItr != i)
-    ++mItr;
-  if (mItr != map.end()) {
-    if (*mItr != i)
-      throw internal_error("Huh???");
-    //fprintf(stderr, "Found at %zd/%zd.\n", ofs, m_size);
-    if (!m_tail.empty()) {
-      *mItr = m_tail.back();
-      m_tail.pop_back();
-    } else {
-      imageIdIndex_map<false>::iterator last = map.end();
-      --last;
-      *mItr = *last;
-      m_size--;
-    }
-  }
-  //else fprintf(stderr, "NOT FOUND!!!\n");
-}
-
-void imageIdIndex_list<true, true>::set_base() {
+void imageIdIndex_list::set_base() {
   if (!m_base.empty())
     return;
 
@@ -281,25 +101,18 @@ void imageIdIndex_list<true, true>::set_base() {
 }
 
 // Specializations accessing images as SigStruct* or size_t map, and imageIdIndex_map as imageId or index map.
-template <>
-inline dbSpaceImpl<false>::imageIterator dbSpaceImpl<false>::image_begin() { return imageIterator(m_images.begin(), *this); }
-template <>
-inline dbSpaceImpl<false>::imageIterator dbSpaceImpl<false>::image_end() { return imageIterator(m_images.end(), *this); }
-template <>
-inline dbSpaceImpl<true>::imageIterator dbSpaceImpl<true>::image_begin() { return imageIterator(m_info.begin(), *this); }
-template <>
-inline dbSpaceImpl<true>::imageIterator dbSpaceImpl<true>::image_end() { return imageIterator(m_info.end(), *this); }
+inline imageIterator dbSpaceImpl::image_begin() { return imageIterator(m_info.begin(), *this); }
+inline imageIterator dbSpaceImpl::image_end() { return imageIterator(m_info.end(), *this); }
 
-template <bool is_simple>
-inline typename dbSpaceImpl<is_simple>::imageIterator dbSpaceImpl<is_simple>::find(imageId i) {
+inline imageIterator dbSpaceImpl::find(imageId i) {
   map_iterator itr = m_images.find(i);
   if (itr == m_images.end())
     throw invalid_id("Invalid image ID.");
   return imageIterator(itr, *this);
 }
 
-inline dbSpaceAlter::ImageMap::iterator dbSpaceAlter::find(imageId i) {
-  ImageMap::iterator itr = m_images.find(i);
+inline sigMap::iterator dbSpaceAlter::find(imageId i) {
+  sigMap::iterator itr = m_images.find(i);
   if (itr == m_images.end())
     throw invalid_id("Invalid image ID.");
   return itr;
@@ -348,22 +161,12 @@ void initImgBin() {
 #endif
 }
 
-template <bool is_simple>
-bool dbSpaceImpl<is_simple>::hasImage(imageId id) {
+bool dbSpaceImpl::hasImage(imageId id) {
   return m_images.find(id) != m_images.end();
 }
 
 bool dbSpaceAlter::hasImage(imageId id) {
   return m_images.find(id) != m_images.end();
-}
-
-template <bool is_simple>
-inline ImgData dbSpaceImpl<is_simple>::get_sig_from_cache(imageId id) {
-  if (is_simple && m_sigFile == -1)
-    throw usage_error("Not supported in simple mode.");
-  ImgData sig;
-  read_sig_cache(find(id).cOfs(), &sig);
-  return sig;
 }
 
 inline ImgData dbSpaceAlter::get_sig(size_t ind) {
@@ -373,13 +176,11 @@ inline ImgData dbSpaceAlter::get_sig(size_t ind) {
   return sig;
 }
 
-template <bool is_simple>
-int dbSpaceImpl<is_simple>::getImageWidth(imageId id) {
+int dbSpaceImpl::getImageWidth(imageId id) {
   return find(id).width();
 }
 
-template <bool is_simple>
-int dbSpaceImpl<is_simple>::getImageHeight(imageId id) {
+int dbSpaceImpl::getImageHeight(imageId id) {
   return find(id).height();
 }
 
@@ -478,23 +279,7 @@ inline B &dbSpaceCommon::bucket_set<B>::at(int col, int coeff, int *idxret) {
   return buckets[col][pn][idx];
 }
 
-template <>
-void dbSpaceImpl<false>::addImageData(const ImgData *img) {
-  if (hasImage(img->id)) // image already in db
-    throw duplicate_id("Image already in database.");
-
-  SigStruct *nsig = new SigStruct(get_sig_cache());
-  nsig->init(img);
-  write_sig_cache(nsig->cacheOfs, img);
-
-  // insert into sigmap
-  m_images.add_sig(img->id, nsig);
-
-  imgbuckets.add(*img, m_nextIndex++);
-}
-
-template <>
-void dbSpaceImpl<true>::addImageData(const ImgData *img) {
+void dbSpaceImpl::addImageData(const ImgData *img) {
   if (hasImage(img->id)) // image already in db
     throw duplicate_id("Image already in database.");
 
@@ -512,19 +297,10 @@ void dbSpaceImpl<true>::addImageData(const ImgData *img) {
   m_info[ind].height = img->height;
   m_images.add_index(img->id, ind);
 
-  if (m_sigFile != -1) {
-    size_t ofs = get_sig_cache();
-    if (ofs != ind * sizeof(ImgData))
-      throw internal_error("Index and cache out of sync!");
-    write_sig_cache(ofs, img);
-  }
-
   imgbuckets.add(*img, ind);
 }
 
 void dbSpaceAlter::addImageData(const ImgData *img) {
-  if (m_readonly)
-    throw usage_error("Not possible in imgdata mode.");
   if (hasImage(img->id)) // image already in db
     throw duplicate_id("Image already in database.");
 
@@ -567,13 +343,12 @@ void dbSpace::imgDataFromBlob(const void *data, size_t data_size, imageId id, Im
   return dbSpaceCommon::imgDataFromBlob(data, data_size, id, img);
 }
 
-template <bool is_simple>
-void dbSpaceImpl<is_simple>::load(const char *filename) {
+void dbSpaceImpl::load(const char *filename) {
+  DEBUG(imgdb)("Loading db (simple) from %s... ", filename);
   db_ifstream f(filename);
-  DEBUG(imgdb)("Loading db... ");
 
   if (!f.is_open()) {
-    DEBUG(warnings)("Unable to open file %s for read ops: %s.\n", filename, strerror(errno));
+    DEBUG(summary)("Unable to open file %s for read ops: %s.\n", filename, strerror(errno));
     return;
   }
 
@@ -603,9 +378,8 @@ void dbSpaceImpl<is_simple>::load(const char *filename) {
 
   // read sigs
   f.seekg(firstOff);
-  if (is_simple)
-    m_info.resize(numImg);
-  for (typename image_map::size_type k = 0; k < numImg; k++) {
+  m_info.resize(numImg);
+  for (sigMap::size_type k = 0; k < numImg; k++) {
     ImgData sig;
     f.read(&sig);
 
@@ -613,41 +387,16 @@ void dbSpaceImpl<is_simple>::load(const char *filename) {
     imgbuckets.add(sig, ind);
 
     if (ids[ind] != sig.id) {
-      if (is_simple) {
-        // DEBUG_CONT(imgdb)(DEBUG_OUT, "\n");
-        DEBUG(warnings)("WARNING: index %zd DB header ID %08llx mismatch with sig ID %08llx.\n", ind, (long long)ids[ind], (long long)sig.id);
-      } else {
-        throw data_error("DB header ID mismatch with sig ID.");
-      }
+      DEBUG(warnings)("WARNING: index %zd DB header ID %08llx mismatch with sig ID %08llx.\n", ind, (long long)ids[ind], (long long)sig.id);
     }
 
-    if (is_simple) {
-      m_info[ind].id = sig.id;
-      SigStruct::avglf2i(sig.avglf, m_info[ind].avgl);
-      m_info[ind].width = sig.width;
-      m_info[ind].height = sig.height;
-      m_images.add_index(sig.id, ind);
+    m_info[ind].id = sig.id;
+    SigStruct::avglf2i(sig.avglf, m_info[ind].avgl);
+    m_info[ind].width = sig.width;
+    m_info[ind].height = sig.height;
 
-      if (m_sigFile != -1) {
-        size_t ofs = get_sig_cache();
-        if (ofs != ind * sizeof(ImgData))
-          throw internal_error("Index and cache out of sync!");
-        write_sig_cache(ofs, &sig);
-      }
-
-    } else {
-      SigStruct *nsig = new SigStruct(get_sig_cache());
-      nsig->init(&sig);
-      nsig->index = ind;
-      write_sig_cache(nsig->cacheOfs, &sig);
-
-      // insert new sig
-      m_images.add_sig(sig.id, nsig);
-    }
+    m_images.add_index(sig.id, ind);
   }
-
-  if (is_simple && is_disk_db)
-    DEBUG_CONT(imgdb)(DEBUG_OUT, "map size: %lld... ", (long long int)lseek(imgbuckets[0][0][0].fd(), 0, SEEK_CUR));
 
   for (typename buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr)
     itr->set_base();
@@ -657,14 +406,16 @@ void dbSpaceImpl<is_simple>::load(const char *filename) {
 }
 
 void dbSpaceAlter::load(const char *filename) {
+  DEBUG(imgdb)("Loading db (alter) from %s... ", filename);
+  delete m_f;
   m_f = new db_fstream(filename);
   m_fname = filename;
   try {
     if (!m_f->is_open()) {
       // Instead of replicating code here to create the basic file structure, we'll just make a dummy DB.
-      AutoCleanPtr<dbSpace> dummy(load_file(filename, mode_normal));
+      auto dummy = std::make_unique<dbSpaceImpl>();
       dummy->save_file(filename);
-      dummy.set(NULL);
+
       m_f->open(filename);
       if (!m_f->is_open())
         throw io_error("Could not create DB structure.");
@@ -712,25 +463,25 @@ void dbSpaceAlter::load(const char *filename) {
   }
 }
 
-static inline dbSpace *make_dbSpace(int mode) {
-  return mode & dbSpaceCommon::mode_mask_alter
-             ? static_cast<dbSpace *>(new dbSpaceAlter(mode & dbSpaceCommon::mode_mask_readonly))
-             : mode & dbSpaceCommon::mode_mask_simple
-                   ? static_cast<dbSpace *>(new dbSpaceImpl<true>(mode & dbSpaceCommon::mode_mask_readonly))
-                   : static_cast<dbSpace *>(new dbSpaceImpl<false>(true));
-}
-
 dbSpace *dbSpace::load_file(const char *filename, int mode) {
-  dbSpace *db = make_dbSpace(mode);
+  dbSpace* db;
+
+  if (mode == dbSpaceCommon::mode_mask_alter) {
+    db = new dbSpaceAlter(filename);
+  } else if (mode == dbSpaceCommon::mode_mask_simple) {
+    db = new dbSpaceImpl();
+  } else {
+    throw usage_error("Unsupported database mode");
+  }
+
   db->load(filename);
   return db;
 }
 
-template <>
-void dbSpaceImpl<false>::save_file(const char *filename) {
+void dbSpaceImpl::save_file(const char* filename) {
   /*
     Serialization order:
-    [image_map::size_type] number of images
+    [sigMap::size_type] number of images
     [off_t] offset to first signature in file
     for each bucket:
     [size_t] number of images in bucket
@@ -740,60 +491,32 @@ void dbSpaceImpl<false>::save_file(const char *filename) {
     then follow image signatures, see struct ImgData
   */
 
-  DEBUG(imgdb)("Saving to %s... ", filename);
-  std::string temp = std::string(filename) + ".temp";
-  db_ofstream f(temp.c_str());
-  if (!f.is_open())
-    throw io_error(std::string("Cannot open temp file ") + temp + " for writing: " + strerror(errno));
+  DEBUG(imgdb)("Saving dummy db... ");
 
-  if (is_disk_db)
-    DEBUG_CONT(imgdb)(DEBUG_OUT, "map size: %lld... ", (long long int)lseek(imgbuckets[0][0][0].fd(), 0, SEEK_CUR));
-  f.write<int32_t>(SRZ_V_CODE);
-  f.write<count_t>(m_images.size());
-  off_t firstOff = f.tellp();
-  firstOff += m_images.size() * sizeof(imageId);    // cur pos plus imageId per image
-  firstOff += imgbuckets.count() * sizeof(count_t); // plus size_t per bucket
+  db_ofstream file(filename);
 
-  // leave space for 1024 new IDs
-  firstOff = (firstOff + 1024 * sizeof(imageId));
-  DEBUG_CONT(imgdb)(DEBUG_OUT, "sig off: %llx... ", (long long int)firstOff);
-  f.write<offset_t>(firstOff);
+  file.write<int32_t>(SRZ_V_CODE);
+  file.write<count_t>(m_images.size());
+
+  offset_t firstOff = 0;
+  firstOff += sizeof(int32_t) + sizeof(count_t) + sizeof(offset_t);
+  firstOff += imgbuckets.size();
+  firstOff += 1024 * sizeof(imageId); // leave space for 1024 new IDs
+
+  file.write<offset_t>(firstOff);
 
   // save bucket sizes
   for (buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr)
-    f.write<count_t>(itr->size());
+    file.write<count_t>(0);
 
-  // save IDs
-  for (imageIterator it = image_begin(); it != image_end(); it++)
-    f.write<imageId>(it.id());
-
-  // skip to firstOff
-  f.seekp(firstOff);
-
-  DEBUG_CONT(imgdb)(DEBUG_OUT, "sigs... ");
-  // save sigs
-  for (imageIterator it = image_begin(); it != image_end(); it++) {
-    ImgData dsig;
-    read_sig_cache(it.cOfs(), &dsig);
-    f.write(dsig);
-  }
-  f.close();
-  if (rename(temp.c_str(), filename))
-    throw io_error(std::string("Cannot rename temp file ") + temp + " to DB file " + filename + ": " + strerror(errno));
   DEBUG_CONT(imgdb)(DEBUG_OUT, "done!\n");
 }
 
-template <>
-void dbSpaceImpl<true>::save_file(const char *filename) { throw usage_error("Can't save read-only db."); }
-
 // Relocate sigs from the end into the holes left by deleted images.
 void dbSpaceAlter::move_deleted() {
-  if (m_readonly)
-    throw usage_error("Not possible in imgdata mode.");
-
   // need to find out which IDs are using the last few indices
   DeletedList::iterator delItr = m_deleted.begin();
-  for (ImageMap::iterator itr = m_images.begin();; ++itr) {
+  for (sigMap::iterator itr = m_images.begin();; ++itr) {
     // Don't fill holes that are beyond the new end!
     while (delItr != m_deleted.end() && *delItr >= m_images.size())
       ++delItr;
@@ -823,13 +546,8 @@ void dbSpaceAlter::move_deleted() {
 }
 
 void dbSpaceAlter::save_file(const char *filename) {
-  if (m_readonly)
-    throw usage_error("Not possible in imgdata mode.");
-
   if (!m_f)
-    return;
-  if (filename && m_fname != filename)
-    throw param_error("Cannot save to different filename.");
+    throw data_error("Couldn't save database; m_f is invalid");
 
   DEBUG(imgdb)("saving file, %zd deleted images... ", m_deleted.size());
   if (!m_deleted.empty())
@@ -838,7 +556,7 @@ void dbSpaceAlter::save_file(const char *filename) {
   if (m_rewriteIDs) {
     DEBUG_CONT(imgdb)(DEBUG_OUT, "Rewriting all IDs... ");
     imageId_list ids(m_images.size(), ~imageId());
-    for (ImageMap::iterator itr = m_images.begin(); itr != m_images.end(); ++itr) {
+    for (sigMap::iterator itr = m_images.begin(); itr != m_images.end(); ++itr) {
       if (itr->second >= m_images.size())
         throw data_error("Invalid index on save.");
       if (ids[itr->second] != ~imageId())
@@ -870,11 +588,8 @@ void dbSpaceAlter::save_file(const char *filename) {
 // image signatures to the end of the file and use the freed space
 // for new image IDs until we run out of space again.
 void dbSpaceAlter::resize_header() {
-  if (m_readonly)
-    throw usage_error("Not possible in imgdata mode.");
-
   // make space for 1024 new IDs
-  size_t numrel = (1024 * sizeof(imageId) + sizeof(ImgData) - 1) / sizeof(ImgData);
+  const size_t numrel = (1024 * sizeof(imageId) + sizeof(ImgData) - 1) / sizeof(ImgData);
   DEBUG(imgdb)("relocating %zd/%zd images... from %llx ", numrel, m_images.size(), (long long int)m_sigOff);
   if (m_images.size() < numrel)
     throw internal_error("dbSpaceAlter::resize_header called with too few images!");
@@ -888,33 +603,28 @@ void dbSpaceAlter::resize_header() {
   m_f->write(sigs, numrel);
 
   size_t addrel = m_images.size() - numrel;
-  for (ImageMap::iterator itr = m_images.begin(); itr != m_images.end(); ++itr)
+  for (sigMap::iterator itr = m_images.begin(); itr != m_images.end(); ++itr)
     itr->second = (itr->second >= numrel ? itr->second - numrel : itr->second + addrel);
   DEBUG_CONT(imgdb)(DEBUG_OUT, "done.\n");
 
   m_rewriteIDs = true;
 }
 
-template <bool is_simple>
-struct sim_result : public index_iterator<is_simple>::base_type {
-  typedef typename index_iterator<is_simple>::base_type itr_type;
+struct sim_result : public imageIterator::base_type {
+  typedef typename imageIterator::base_type itr_type;
   sim_result(Score s, const itr_type &i) : itr_type(i), score(s) {}
   bool operator<(const sim_result &other) const { return score < other.score; }
   Score score;
 };
 
-template <bool is_simple>
-inline bool dbSpaceImpl<is_simple>::skip_image(const imageIterator &itr) {
-  return (is_simple && !itr.avgl().v[0]);
+inline bool dbSpaceImpl::skip_image(const imageIterator &itr) {
+  return !itr.avgl().v[0];
 }
 
-template <bool is_simple>
-template <int num_colors>
-sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
+sim_vector dbSpaceImpl::do_query(queryArg q, int num_colors) {
   int c;
   Score scale = 0;
   int sketch = 0;
-  //fprintf(stderr, is_simple?"In do_query<true%d>.\n":"In do_query<false%d>.\n", num_colors);
 
   if (!m_bucketsValid)
     throw usage_error("Can't query with invalid buckets.");
@@ -970,23 +680,23 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
       scale -= weight;
 
       // update the score of every image which has this coef
-      AutoImageIdIndex_map<is_simple> map(bucket.map_all(false));
+      AutoImageIdIndex_map map(bucket.map_all());
 #if QUERYSTATS
       size_t len = bucket.size();
       coeflen += len;
       coefmax = std::max(coefmax, len);
       coefcnt++;
 #endif
-      for (idIndexIterator itr(map.begin(), *this); itr != map.end(); ++itr) {
-        scores[itr.index()] -= weight;
+      for (auto itr(map.begin()); itr != map.end(); ++itr) {
+        scores[itr.get_index()] -= weight;
 #if QUERYSTATS
-        counts[itr.index()]++;
+        counts[itr.get_index()]++;
 #endif
       }
-      for (idIndexTailIterator itr(bucket.tail().begin(), *this); itr != bucket.tail().end(); ++itr) {
-        scores[itr.index()] -= weight;
+      for (imageIdIndex_list::container::const_iterator itr(bucket.tail().begin()); itr != bucket.tail().end(); ++itr) {
+        scores[itr.get_index()] -= weight;
 #if QUERYSTATS
-        counts[itr.index()]++;
+        counts[itr.get_index()]++;
 #endif
       }
     }
@@ -999,7 +709,7 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
   fprintf(stderr, "\n");
 #endif
 
-  typedef std::priority_queue<sim_result<is_simple>> sigPriorityQueue;
+  typedef std::priority_queue<sim_result> sigPriorityQueue;
 
   sigPriorityQueue pqResults; /* results priority queue; largest at top */
 
@@ -1021,7 +731,7 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
 #if QUERYSTATS
     setcnt[counts[itr.index()]]++;
 #endif
-    pqResults.push(sim_result<is_simple>(scores[itr.index()], itr));
+    pqResults.push(sim_result(scores[itr.index()], itr));
 
     int flag_uniqueset = 0;
     if (flag_uniqueset) //{
@@ -1043,7 +753,7 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
       // Make room by dropping largest entry:
       int flag_uniqueset = 0;
       if (flag_uniqueset) {
-        pqResults.push(sim_result<is_simple>(scores[itr.index()], itr));
+        pqResults.push(sim_result(scores[itr.index()], itr));
         need += ++sets[itr.set()] > 1;
         //imageIterator top(pqResults.top(), *this);fprintf(stderr, "Added id=%08lx score=%.2f set=%x, now need %d. Worst is id %08lx score %.2f set %x has %zd\n", itr.id(), (double)scores[itr.index()]/ScoreMax, itr.set(), need, top.id(), (double)pqResults.top().score/ScoreMax, top.set(), sets[top.set()]);
 
@@ -1055,7 +765,7 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
       } else {
         pqResults.pop();
         // Insert new entry:
-        pqResults.push(sim_result<is_simple>(scores[itr.index()], itr));
+        pqResults.push(sim_result(scores[itr.index()], itr));
       }
     }
   }
@@ -1065,7 +775,7 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
     scale = ((DScore)MakeScore(1)) * MakeScore(1) / scale;
   //fprintf(stderr, "Inverted scale=%f\n", ScD(scale));
   while (!pqResults.empty()) {
-    const sim_result<is_simple> &curResTmp = pqResults.top();
+    const sim_result &curResTmp = pqResults.top();
 
     imageIterator itr(curResTmp, *this);
     //fprintf(stderr, "Candidate %08lx = %.2f, set %x has %zd.\n", itr.id(), ScD(curResTmp.score), itr.set(), sets[itr.set()]);
@@ -1094,28 +804,15 @@ sim_vector dbSpaceImpl<is_simple>::do_query(queryArg q) {
   return V;
 }
 
-template <bool is_simple>
 inline sim_vector
-dbSpaceImpl<is_simple>::queryImg(const queryArg &query) {
+dbSpaceImpl::queryImg(const queryArg &query) {
   if (is_grayscale(query.avgl))
-    return do_query<1>(query);
+    return do_query(query, 1);
   else
-    return do_query<3>(query);
+    return do_query(query, 3);
 }
 
-template <>
-void dbSpaceImpl<false>::removeImage(imageId id) {
-  SigStruct *isig = find(id).sig();
-  ImgData nsig;
-  read_sig_cache(isig->cacheOfs, &nsig);
-  imgbuckets.remove(nsig);
-  m_bucketsValid = false;
-  m_images.erase(id);
-  delete isig;
-}
-
-template <>
-void dbSpaceImpl<true>::removeImage(imageId id) {
+void dbSpaceImpl::removeImage(imageId id) {
   // Can't efficiently remove it from buckets, just mark it as
   // invalid and remove it from query results.
   m_info[find(id).index()].avgl.v[0] = 0;
@@ -1123,10 +820,7 @@ void dbSpaceImpl<true>::removeImage(imageId id) {
 }
 
 void dbSpaceAlter::removeImage(imageId id) {
-  if (m_readonly)
-    throw usage_error("Not possible in imgdata mode.");
-
-  ImageMap::iterator itr = find(id);
+  sigMap::iterator itr = find(id);
   m_deleted.push_back(itr->second);
   m_images.erase(itr);
 }
@@ -1208,58 +902,30 @@ Score dbSpaceCommon::calcSim(imageId id1, imageId id2, bool ignore_color) {
   return DScSc(((DScore)score) * 100 * scale);
 }
 
-template <>
-void dbSpaceImpl<false>::rehash() {
-  for (buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr) {
-    size_t size = itr->size();
-    itr->clear();
-    itr->resize(size & ~pageImgMask);
-  }
-
-  for (imageIterator itr = image_begin(); itr != image_end(); ++itr) {
-    ImgData dsig;
-    read_sig_cache(itr.cOfs(), &dsig);
-    imgbuckets.add(dsig, itr.index());
-  }
-
-  m_bucketsValid = true;
+void dbSpaceImpl::rehash() {
+  throw usage_error("Not supported");
 }
 
-template <>
-void dbSpaceImpl<true>::rehash() { throw usage_error("Invalid for read-only db."); }
-
 void dbSpaceAlter::rehash() {
-  if (m_readonly)
-    throw usage_error("Not possible in imgdata mode.");
-
   memset(m_buckets.begin(), 0, m_buckets.size());
 
-  for (ImageMap::iterator it = m_images.begin(); it != m_images.end(); ++it)
+  for (sigMap::iterator it = m_images.begin(); it != m_images.end(); ++it)
     m_buckets.add(get_sig(it->second), it->second);
 }
 
-template <bool is_simple>
-void dbSpaceImpl<is_simple>::getImgQueryArg(imageId id, queryArg *query) {
-  ImgData img = get_sig_from_cache(id);
-  queryFromImgData(img, query);
-}
-
-template <bool is_simple>
-size_t dbSpaceImpl<is_simple>::getImgCount() {
+size_t dbSpaceImpl::getImgCount() {
   return m_images.size();
 }
 
 size_t dbSpaceAlter::getImgCount() {
   return m_images.size();
 }
-
-template <bool is_simple>
-imageId_list dbSpaceImpl<is_simple>::getImgIdList() {
+imageId_list dbSpaceImpl::getImgIdList() {
   imageId_list ids;
 
   ids.reserve(getImgCount());
   for (imageIterator it = image_begin(); it != image_end(); ++it)
-    if (!is_simple || it.avgl().v[0] != 0)
+    if (!skip_image(it))
       ids.push_back(it.id());
 
   return ids;
@@ -1269,7 +935,7 @@ imageId_list dbSpaceAlter::getImgIdList() {
   imageId_list ids;
 
   ids.reserve(m_images.size());
-  for (ImageMap::iterator it = m_images.begin(); it != m_images.end(); ++it)
+  for (sigMap::iterator it = m_images.begin(); it != m_images.end(); ++it)
     ids.push_back(it->first);
 
   return ids;
@@ -1278,37 +944,21 @@ imageId_list dbSpaceAlter::getImgIdList() {
 dbSpace::dbSpace() {}
 dbSpace::~dbSpace() {}
 
-template <bool is_simple>
-dbSpaceImpl<is_simple>::dbSpaceImpl(bool with_struct) : m_sigFile(-1),
-                                                        m_cacheOfs(0),
-                                                        m_nextIndex(0),
-                                                        m_bucketsValid(true) {
-
+dbSpaceImpl::dbSpaceImpl() : m_nextIndex(0), m_bucketsValid(true) {
   if (!imgBinInited)
     initImgBin();
   if (imgbuckets.count() != sizeof(imgbuckets) / sizeof(imgbuckets[0][0][0]))
     throw internal_error("bucket_set.count() is wrong!");
-
-  if (with_struct)
-    m_sigFile = tempfile();
 }
 
-dbSpaceAlter::dbSpaceAlter(bool readonly) : m_f(NULL), m_readonly(readonly) {
+dbSpaceAlter::dbSpaceAlter(const char* filename) : m_f(NULL), m_rewriteIDs(false), m_readonly(false) {
   if (!imgBinInited)
     initImgBin();
+
+  m_f = new db_fstream(filename);
 }
 
-template <>
-dbSpaceImpl<false>::~dbSpaceImpl() {
-  close(m_sigFile);
-  for (imageIterator itr = image_begin(); itr != image_end(); ++itr)
-    delete itr.sig();
-}
-
-template <>
-dbSpaceImpl<true>::~dbSpaceImpl() {
-  if (m_sigFile != -1)
-    close(m_sigFile);
+dbSpaceImpl::~dbSpaceImpl() {
 }
 
 dbSpaceAlter::~dbSpaceAlter() {
@@ -1319,33 +969,6 @@ dbSpaceAlter::~dbSpaceAlter() {
     m_f = NULL;
     m_fname.clear();
   }
-}
-
-template <bool is_simple>
-size_t dbSpaceImpl<is_simple>::get_sig_cache() {
-  size_t ofs = m_cacheOfs;
-  m_cacheOfs += sizeof(ImgData);
-  return ofs;
-}
-
-template <bool is_simple>
-void dbSpaceImpl<is_simple>::read_sig_cache(size_t ofs, ImgData *sig) {
-  if (m_sigFile == -1)
-    throw internal_error("Can't read sig cache when using simple db.");
-  if (lseek(m_sigFile, ofs, SEEK_SET) == -1)
-    throw io_error("Can't seek in sig cache.");
-  if (read(m_sigFile, sig, sizeof(ImgData)) != sizeof(ImgData))
-    throw io_error("Can't read sig cache.");
-}
-
-template <bool is_simple>
-void dbSpaceImpl<is_simple>::write_sig_cache(size_t ofs, const ImgData *sig) {
-  if (m_sigFile == -1)
-    throw internal_error("Can't write sig cache when using simple db.");
-  if (lseek(m_sigFile, ofs, SEEK_SET) == -1)
-    throw io_error("Can't seek in sig cache.");
-  if (write(m_sigFile, sig, sizeof(ImgData)) != sizeof(ImgData))
-    throw io_error("Can't write to sig cache.");
 }
 
 } // namespace imgdb

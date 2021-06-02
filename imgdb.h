@@ -133,24 +133,6 @@ DEFINE_ERROR(image_error, simple_error) // Could not successfully extract image 
 DEFINE_ERROR(duplicate_id, param_error) // Image ID already in DB.
 DEFINE_ERROR(invalid_id, param_error)   // Image ID not found in DB.
 
-// io_error with a specific errno
-class io_errno : public io_error {
-public:
-  io_errno(int code) throw() : io_error(NULL, "io_errno"), m_code(code) {}
-  const char *what() const throw() { return strerror(m_code); }
-  virtual int code() const throw() { return m_code; }
-
-private:
-  int m_code;
-};
-
-// and also a text
-class io_errno_desc : public io_errno {
-public:
-  io_errno_desc(int code, const char *what) throw() : io_errno(code) { m_what = what; }
-  const char *more() const throw() { return m_what; }
-};
-
 #ifdef INTMATH
 // fixme: make Score and DScore proper classes with conversion operators
 typedef int32_t Score;
@@ -207,12 +189,7 @@ struct image_info {
 
 typedef std::vector<sim_value> sim_vector;
 typedef std::vector<imageId> imageId_list;
-typedef std::vector<image_info> image_info_list;
 typedef Idx sig_t[NUM_COEFS];
-
-template <typename T>
-class imageIdMap : public std::unordered_map<imageId, T> {
-};
 
 struct ImgData {
   imageId id;      /* picture id */
@@ -240,11 +217,8 @@ struct queryArg {
 
 class dbSpace {
 public:
-  static const int mode_normal = 0x00;   // Full functionality, but slower queries.
-  static const int mode_readonly = 0x03; // Fast queries, cannot save back to disk.
   static const int mode_simple = 0x02;   // Fast queries, less memory, cannot save, no image ID queries.
   static const int mode_alter = 0x04;    // Fast add/remove/info on existing DB file, no queries.
-  static const int mode_imgdata = 0x05;  // Similar to mode_alter, but read-only, to retrieve image data.
 
   static dbSpace *load_file(const char *filename, int mode);
   virtual void save_file(const char *filename) = 0;
@@ -258,7 +232,6 @@ public:
   static void imgDataFromBlob(const void *data, size_t data_size, imageId id, ImgData *img);
 
   // Initialize sig and avgl of the queryArg.
-  virtual void getImgQueryArg(imageId id, queryArg *query) = 0;
   static void queryFromImgData(const ImgData &img, queryArg *query);
 
   // Stats.

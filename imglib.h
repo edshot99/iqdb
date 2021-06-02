@@ -58,6 +58,8 @@ different but the majority of the actual code is the same for both types.
 
 namespace imgdb {
 
+class dbSpaceImpl;
+
 typedef unsigned int uint;
 
 // Weights for the Haar coefficients.
@@ -95,32 +97,7 @@ union image_id_index {
 
 typedef std::vector<image_id_index> IdIndex_list;
 
-template <bool is_simple>
-struct map_iterator;
-template <>
-struct map_iterator<false> : public std::iterator<std::forward_iterator_tag, image_id_index> {
-  map_iterator(image_id_index *p) : m_p(p) {}
-  map_iterator() {}
-
-  image_id_index *operator->() const { return m_p; }
-  image_id_index &operator*() const { return *m_p; }
-  map_iterator &operator++() {
-    ++m_p;
-    return *this;
-  }
-  map_iterator operator++(int) { return m_p++; }
-  map_iterator &operator--() {
-    --m_p;
-    return *this;
-  }
-  map_iterator operator--(int) { return m_p--; }
-  bool operator!=(const map_iterator &other) { return m_p != other.m_p; }
-
-  image_id_index *m_p;
-};
-
-template <>
-struct map_iterator<true> : public delta_iterator {
+struct map_iterator : public delta_iterator {
   typedef delta_iterator base_type;
 
   map_iterator(const size_t *idx) : base_type((delta_value *)idx) {}
@@ -133,7 +110,6 @@ struct map_iterator<true> : public delta_iterator {
 struct mapped_file {
   mapped_file() : m_base(NULL) {}
   mapped_file(void *base, size_t len) : m_base(base), m_length(len) {}
-  mapped_file(const char *fname, bool writable);
 
   void unmap();
 
@@ -141,36 +117,27 @@ struct mapped_file {
   size_t m_length;
 };
 
-template <bool is_simple>
 struct imageIdIndex_map : public mapped_file {
-  typedef map_iterator<is_simple> iterator;
   imageIdIndex_map() {}
-  imageIdIndex_map(void *base, iterator img, iterator end, size_t l)
+  imageIdIndex_map(void *base, map_iterator img, map_iterator end, size_t l)
       : mapped_file(base, l), m_img(img), m_end(end) {}
-  iterator begin() { return m_img; }
-  iterator end() { return m_end; }
+  map_iterator begin() { return m_img; }
+  map_iterator end() { return m_end; }
 
-  iterator m_img;
-  iterator m_end;
+  map_iterator m_img;
+  map_iterator m_end;
 };
 
 // Automatically unmaps the imageIdIndex_map when it goes out of scope.
-template <bool is_simple>
-struct AutoImageIdIndex_map : public imageIdIndex_map<is_simple> {
-  typedef imageIdIndex_map<is_simple> base_type;
-  AutoImageIdIndex_map(const imageIdIndex_map<is_simple> &map) : base_type(map) {}
+struct AutoImageIdIndex_map : public imageIdIndex_map {
+  typedef imageIdIndex_map base_type;
+  AutoImageIdIndex_map(const imageIdIndex_map &map) : base_type(map) {}
   ~AutoImageIdIndex_map() { base_type::unmap(); }
 };
 
 typedef gdImage Image;
 
-typedef std::pair<off_t, size_t> imageIdPage;
-
-template <bool is_simple, bool is_memory>
-class imageIdIndex_list;
-
-template <>
-class imageIdIndex_list<true, true> {
+class imageIdIndex_list {
 public:
   static const size_t threshold = 0;
   class container : public delta_queue {
@@ -181,7 +148,7 @@ public:
     };
   };
 
-  imageIdIndex_map<true> map_all(bool writable) { return writable ? imageIdIndex_map<true>(NULL, m_tail.begin(), m_tail.end(), 0) : imageIdIndex_map<true>(NULL, m_base.begin(), m_base.end(), 0); };
+  imageIdIndex_map map_all() { return imageIdIndex_map(NULL, m_base.begin(), m_base.end(), 0); };
   bool empty() { return m_tail.empty() && m_base.empty(); }
   size_t size() { return m_tail.size() + m_base.size(); }
   void reserve(size_t num) {
@@ -199,58 +166,6 @@ public:
 protected:
   container m_tail;
   container m_base;
-};
-
-template <bool is_simple>
-class imageIdIndex_list<is_simple, false> {
-public:
-  static const size_t threshold = 128;
-
-  class container : public IdIndex_list {
-  public:
-    struct const_iterator : public IdIndex_list::const_iterator {
-      typedef IdIndex_list::const_iterator base_type;
-      const_iterator(const base_type &itr) : base_type(itr) {}
-      size_t get_index() const { return (*this)->index; }
-    };
-  };
-
-  imageIdIndex_list() : m_size(0), m_capacity(0) {}
-
-  imageIdIndex_map<is_simple> map_all(bool writable);
-  bool empty() { return !m_size && m_tail.empty(); }
-  size_t size() { return m_size + m_tail.size(); }
-  void reserve(size_t num) { resize(num); }
-  void resize(size_t num);
-  void set_base() {}
-  void push_back(image_id_index i) {
-    m_tail.push_back(i);
-    if (m_tail.size() >= threshold && can_page_out())
-      page_out();
-  }
-  void remove(image_id_index i);
-  void clear() {
-    m_tail.clear();
-    m_size = 0;
-  }
-
-  const container &tail() { return m_tail; }
-
-  static int fd() { return m_fd; }
-
-protected:
-  typedef std::vector<imageIdPage> page_list;
-
-  bool can_page_out() { return !is_simple || m_size < m_capacity; }
-  void page_out();
-
-  static int m_fd;
-
-  page_list m_pages;
-  size_t m_size;
-  size_t m_capacity;
-  size_t m_baseofs;
-  container m_tail;
 };
 
 /* in memory signature structure */
@@ -275,54 +190,18 @@ public:
   }
 };
 
-template <bool is_simple>
-class dbSpaceImpl;
-
-template <bool is_simple>
-class sigMap;
-
-template <>
-class sigMap<false> : public imageIdMap<SigStruct *> {
+class sigMap : public std::unordered_map<imageId, size_t> {
 public:
-  void add_sig(imageId id, SigStruct *sig) { (*this)[id] = sig; }
-  void add_index(imageId id, size_t index) { throw usage_error("Only valid in read-only mode."); }
-};
-
-template <>
-class sigMap<true> : public imageIdMap<size_t> {
-public:
-  void add_sig(imageId id, SigStruct *sig) { throw usage_error("Not valid in read-only mode."); }
   void add_index(imageId id, size_t index) { (*this)[id] = index; }
-};
-
-template <bool is_simple>
-struct index_iterator;
-
-// In normal mode, we have image data in the sigMap, so iterate over that.
-template <>
-struct index_iterator<false> : public sigMap<false>::iterator {
-  typedef sigMap<false>::iterator base_type;
-  index_iterator(const base_type &itr, dbSpaceImpl<false> &db) : base_type(itr) {}
-
-  imageId id() const { return (*this)->first; }
-  SigStruct *sig() const { return (*this)->second; }
-  size_t index() const { return sig()->index; }
-  const lumin_native &avgl() const { return sig()->avgl; }
-  int width() const { return sig()->width; }
-  int height() const { return sig()->height; }
-  uint16_t set() const { return sig()->set; }
-  uint16_t mask() const { return sig()->mask; }
-  size_t cOfs() const { return sig()->cacheOfs; }
 };
 
 // In simple mode, we have only the image_info data available, so iterate over that.
 // In read-only mode, we additionally have the index into the image_info array in a sigMap.
 // Using functions that rely on this in simple mode will throw a usage_error.
-template <>
-struct index_iterator<true> : public image_info_list::iterator {
-  typedef image_info_list::iterator base_type;
-  index_iterator(const base_type &itr, dbSpaceImpl<true> &db) : base_type(itr), m_db(db) {}
-  index_iterator(const sigMap<true>::iterator &itr, dbSpaceImpl<true> &db); // implemented below
+struct imageIterator : public std::vector<image_info>::iterator {
+  typedef std::vector<image_info>::iterator base_type;
+  imageIterator(const base_type &itr, dbSpaceImpl &db) : base_type(itr), m_db(db) {}
+  imageIterator(const sigMap::iterator &itr, dbSpaceImpl &db); // implemented below
 
   imageId id() const { return (*this)->id; }
   SigStruct *sig() const { throw usage_error("Not valid in read-only mode."); }
@@ -334,29 +213,7 @@ struct index_iterator<true> : public image_info_list::iterator {
   uint16_t mask() const { return (*this)->mask; }
   size_t cOfs() const { return index() * sizeof(ImgData); }
 
-  dbSpaceImpl<true> &m_db;
-};
-
-// Iterate over a bucket of imageIdIndex values.
-template <bool is_simple, typename B>
-struct id_index_iterator;
-
-// In normal mode, the imageIdIndex_map stores image IDs. Get the index from the dbSpace's linked SigStruct.
-template <typename B>
-struct id_index_iterator<false, B> : public B {
-  typedef B base_type;
-  id_index_iterator(const base_type &itr, dbSpaceImpl<false> &db) : base_type(itr), m_db(db) {}
-  size_t index() const; // Implemented below.
-
-  dbSpaceImpl<false> &m_db;
-};
-
-// In read-only/simple mode, the imageIdIndex_map stores the index directly.
-template <typename B>
-struct id_index_iterator<true, B> : public B {
-  typedef B base_type;
-  id_index_iterator(const base_type &itr, dbSpaceImpl<true> &db) : base_type(itr) {}
-  size_t index() const { return this->get_index(); };
+  dbSpaceImpl &m_db;
 };
 
 // Simplify reading/writing stream data.
@@ -391,14 +248,18 @@ public:
 class db_ofstream : public std::ofstream {
 public:
   typedef std::ofstream base_type;
-  db_ofstream(const char *fname) : base_type(fname, std::ios::binary){};
+  db_ofstream(const char *fname) : base_type(fname, std::ios::binary | std::ios::trunc){};
   WRITER_WRAPPERS
 };
 
 class db_fstream : public std::fstream {
 public:
   typedef std::fstream base_type;
-  db_fstream(const char *fname) : base_type(fname, std::ios::binary | std::ios::in | std::ios::out){};
+
+  db_fstream(const char *fname) {
+    open(fname, binary | in | out);
+  }
+
   READER_WRAPPERS
   WRITER_WRAPPERS
 };
@@ -418,7 +279,6 @@ public:
   virtual Score calcAvglDiff(imageId id1, imageId id2);
   virtual Score calcSim(imageId id1, imageId id2, bool ignore_color = false);
 
-  static const int mode_mask_readonly = 0x01;
   static const int mode_mask_simple = 0x02;
   static const int mode_mask_alter = 0x04;
 
@@ -466,18 +326,15 @@ private:
 };
 
 // Specific implementations.
-template <bool is_simple>
 class dbSpaceImpl : public dbSpaceCommon {
 public:
-  dbSpaceImpl(bool with_struct);
+  dbSpaceImpl();
   virtual ~dbSpaceImpl();
 
   virtual void save_file(const char *filename);
 
   // Image queries.
   virtual sim_vector queryImg(const queryArg &query);
-
-  virtual void getImgQueryArg(imageId id, queryArg *query);
 
   // Stats.
   virtual size_t getImgCount();
@@ -493,20 +350,11 @@ public:
   virtual void rehash();
 
 private:
-  static const bool is_memory = is_simple;
+  typedef typename sigMap::iterator map_iterator;
 
-  typedef index_iterator<is_simple> imageIterator;
-  typedef sigMap<is_simple> image_map;
-  typedef typename image_map::iterator map_iterator;
+  friend struct imageIterator;
 
-  typedef id_index_iterator<is_simple, typename imageIdIndex_map<is_simple>::iterator> idIndexIterator;
-  typedef id_index_iterator<is_simple, typename imageIdIndex_list<is_simple, is_memory>::container::const_iterator> idIndexTailIterator;
-
-  friend struct index_iterator<is_simple>;
-  friend struct id_index_iterator<is_simple, typename imageIdIndex_map<is_simple>::iterator>;
-  friend struct id_index_iterator<is_simple, typename imageIdIndex_list<is_simple, is_memory>::container::const_iterator>;
-
-  image_info_list &info() { return m_info; }
+  std::vector<image_info> &info() { return m_info; }
   imageIterator find(imageId i);
 
   virtual void load(const char *filename);
@@ -516,34 +364,23 @@ private:
   imageIterator image_begin();
   imageIterator image_end();
 
-  void addSigToBuckets(const ImgData *nsig);
-
-  void getImgDataByID(imageId id, ImgData *img) { *img = get_sig_from_cache(id); }
+  void getImgDataByID(imageId id, ImgData *img) { throw usage_error("Not supported in simple mode."); }
   void getImgAvgl(imageId id, lumin_native &avgl) { avgl = find(id).avgl(); }
 
-  size_t get_sig_cache();
-  ImgData get_sig_from_cache(imageId i);
-  void write_sig_cache(size_t ofs, const ImgData *sig);
-  void read_sig_cache(size_t ofs, ImgData *sig);
+  sim_vector do_query(const queryArg q, int num_colors);
 
-  template <int num_colors>
-  sim_vector do_query(const queryArg q);
-
-  int m_sigFile;
-  size_t m_cacheOfs;
-
-  image_map m_images;
+  sigMap m_images;
 
   size_t m_nextIndex;
-  image_info_list m_info;
+  std::vector<image_info> m_info;
 
   /* Lists of picture ids, indexed by [color-channel][sign][position], i.e.,
 	   R=0/G=1/B=2, pos=0/neg=1, (i*NUM_PIXELS+j)
 	 */
 
-  struct bucket_type : public imageIdIndex_list<is_simple, is_memory> {
-    typedef imageIdIndex_list<is_simple, is_memory> base_type;
-    void add(image_id_index id, count_t index) { base_type::push_back(is_simple ? image_id_index(index, true) : image_id_index(id)); }
+  struct bucket_type : public imageIdIndex_list {
+    typedef imageIdIndex_list base_type;
+    void add(image_id_index id, count_t index) { base_type::push_back(image_id_index(index, true)); }
     void remove(image_id_index id) { base_type::remove(id); }
   };
   typedef bucket_set<bucket_type> buckets_t;
@@ -554,14 +391,13 @@ private:
 // Directly modify DB file on disk.
 class dbSpaceAlter : public dbSpaceCommon {
 public:
-  dbSpaceAlter(bool readonly);
+  dbSpaceAlter(const char* filename);
   virtual ~dbSpaceAlter();
 
   virtual void save_file(const char *filename);
 
   // Image queries not supported.
   virtual sim_vector queryImg(const queryArg &query) { throw usage_error("Not supported in alter mode."); }
-  virtual void getImgQueryArg(imageId id, queryArg *query) { throw usage_error("Not supported in alter mode."); }
 
   // Stats. Partially unsupported.
   virtual size_t getImgCount();
@@ -577,9 +413,7 @@ public:
   virtual void rehash();
 
 protected:
-  typedef imageIdMap<size_t> ImageMap;
-
-  ImageMap::iterator find(imageId i);
+  sigMap::iterator find(imageId i);
   void getImgDataByID(imageId id, ImgData *img) { *img = get_sig(m_images.find(id)->second); }
   void getImgAvgl(imageId id, lumin_native &avgl) { image_info::avglf2i(get_sig(m_images.find(id)->second).avglf, avgl); }
   ImgData get_sig(size_t ind);
@@ -601,7 +435,7 @@ private:
 
   typedef std::vector<size_t> DeletedList;
 
-  ImageMap m_images;
+  sigMap m_images;
   db_fstream *m_f;
   std::string m_fname;
   offset_t m_hdrOff, m_sigOff, m_imgOff;
@@ -625,11 +459,9 @@ static const uint32_t SRZ_V_SZ = (sizeof(res_t)) |
 static const uint32_t SRZ_V_CODE = (SRZ_V0_9_0) | (SRZ_V_SZ << 8);
 
 // Delayed implementations.
-inline index_iterator<true>::index_iterator(const sigMap<true>::iterator &itr, dbSpaceImpl<true> &db)
+inline imageIterator::imageIterator(const sigMap::iterator &itr, dbSpaceImpl &db)
     : base_type(db.info().begin() + itr->second), m_db(db) {}
-inline size_t index_iterator<true>::index() const { return *this - m_db.info().begin(); }
-template <typename B>
-inline size_t id_index_iterator<false, B>::index() const { return m_db.find((*this)->id).index(); }
+inline size_t imageIterator::index() const { return *this - m_db.info().begin(); }
 
 } // namespace imgdb
 
