@@ -19,6 +19,7 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 \**************************************************************************/
 
+#include <memory>
 #include <errno.h>
 #include <stdio.h>
 
@@ -52,27 +53,25 @@ image_types get_image_info(const unsigned char *data, size_t length) {
   }
 }
 
-gdImage* resize_image_data(const unsigned char *data, size_t len, unsigned int thu_x, unsigned int thu_y) {
+Image resize_image_data(const unsigned char *data, size_t len, unsigned int thu_x, unsigned int thu_y) {
   auto type = get_image_info(data, len);
 
   if (type != IMG_JPEG)
     throw imgdb::image_error("Unsupported image format.");
 
-  AutoCleanPtrF<gdImage, &gdImageDestroy> thu(gdImageCreateTrueColor(thu_x, thu_y));
+  Image thu(gdImageCreateTrueColor(thu_x, thu_y), &gdImageDestroy);
   if (!thu)
     throw imgdb::simple_error("Out of memory.");
 
-  AutoCleanPtrF<gdImage, &gdImageDestroy> img;
-  img.set(gdImageCreateFromJpegPtr(len, const_cast<unsigned char *>(data)));
+  Image img(gdImageCreateFromJpegPtr(len, const_cast<unsigned char *>(data)), &gdImageDestroy);
   if (!img)
     throw imgdb::image_error("Could not read image.");
 
-  if ((unsigned int)img->sx == thu_x && (unsigned int)img->sy == thu_y)
-    return img.detach();
+  if ((unsigned int)img->sx == thu_x && (unsigned int)img->sy == thu_y && gdImageTrueColor(img))
+    return img;
 
-  gdImageCopyResampled(thu, img, 0, 0, 0, 0, thu_x, thu_y, img->sx, img->sy);
+  gdImageCopyResampled(thu.get(), img.get(), 0, 0, 0, 0, thu_x, thu_y, img->sx, img->sy);
   DEBUG(terse)("Resized %d x %d to %d x %d.\n", img->sx, img->sy, thu_x, thu_y);
 
-  // Stop autocleaning thu, and return its value instead.
-  return thu.detach();
+  return thu;
 }

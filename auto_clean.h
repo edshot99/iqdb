@@ -67,35 +67,4 @@ private:
   T *m_p;
 };
 
-template <typename T, void (*cleanup_func)(T *)>
-class AutoCleanPtrF {
-public:
-  AutoCleanPtrF() : m_p(NULL) {}
-  AutoCleanPtrF(T *p) : m_p(p) {}
-  ~AutoCleanPtrF() { set(NULL); }
-
-  T *set(T *p) {
-    T *old = m_p;
-    if (m_p)
-      cleanup_func(m_p);
-    m_p = p;
-    return old;
-  }
-  T *detach() {
-    T *old = m_p;
-    m_p = NULL;
-    return old;
-  }
-
-  operator T *() { return m_p; }
-
-  T *operator->() { return m_p; }
-  bool operator!() { return !m_p; }
-
-private:
-  AutoCleanPtrF &operator=(const AutoCleanPtrF &);
-
-  T *m_p;
-};
-
 #endif // AUTO_CLEAN_H

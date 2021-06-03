@@ -186,7 +186,7 @@ bool dbSpaceCommon::isImageGrayscale(imageId id) {
   return is_grayscale(avgl);
 }
 
-void dbSpaceCommon::sigFromImage(Image *image, imageId id, ImgData *sig) {
+void dbSpaceCommon::sigFromImage(const Image &image, imageId id, ImgData *sig) {
   std::vector<unsigned char> rchan(NUM_PIXELS * NUM_PIXELS);
   std::vector<unsigned char> gchan(NUM_PIXELS * NUM_PIXELS);
   std::vector<unsigned char> bchan(NUM_PIXELS * NUM_PIXELS);
@@ -195,19 +195,11 @@ void dbSpaceCommon::sigFromImage(Image *image, imageId id, ImgData *sig) {
   sig->width = 0;
   sig->height = 0;
 
-  AutoGDImage resized;
-  if (image->sx != NUM_PIXELS || image->sy != NUM_PIXELS || !gdImageTrueColor(image)) {
-    resized.set(gdImageCreateTrueColor(NUM_PIXELS, NUM_PIXELS));
-    gdImageFilledRectangle(resized, 0, 0, NUM_PIXELS, NUM_PIXELS, gdTrueColor(255, 255, 255));
-    gdImageCopyResampled(resized, image, 0, 0, 0, 0, NUM_PIXELS, NUM_PIXELS, image->sx, image->sy);
-    image = resized;
-  }
-
   for (int y = 0; y < NUM_PIXELS; y++) {
     for (int x = 0; x < NUM_PIXELS; x++) {
       // https://libgd.github.io/manuals/2.3.1/files/gd-c.html#gdImageGetPixel
       // https://libgd.github.io/manuals/2.3.1/files/gd-h.html#gdTrueColorGetRed
-      int pixel = gdImageGetPixel(image, x, y);
+      int pixel = gdImageGetPixel(image.get(), x, y);
       rchan[x + y * NUM_PIXELS] = gdTrueColorGetRed(pixel);
       gchan[x + y * NUM_PIXELS] = gdTrueColorGetGreen(pixel);
       bchan[x + y * NUM_PIXELS] = gdTrueColorGetBlue(pixel);
@@ -320,7 +312,7 @@ void dbSpaceCommon::addImageBlob(imageId id, const void *blob, size_t length) {
 }
 
 void dbSpaceCommon::imgDataFromBlob(const void *data, size_t data_size, imageId id, ImgData *img) {
-  AutoGDImage image(resize_image_data((const unsigned char *)data, data_size, NUM_PIXELS, NUM_PIXELS));
+  Image image = resize_image_data((const unsigned char *)data, data_size, NUM_PIXELS, NUM_PIXELS);
   sigFromImage(image, id, img);
 }
 

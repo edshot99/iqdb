@@ -135,8 +135,6 @@ struct AutoImageIdIndex_map : public imageIdIndex_map {
   ~AutoImageIdIndex_map() { base_type::unmap(); }
 };
 
-typedef gdImage Image;
-
 class imageIdIndex_list {
 public:
   static const size_t threshold = 0;
@@ -280,7 +278,7 @@ protected:
   virtual void getImgDataByID(imageId id, ImgData *img) = 0;
   virtual void getImgAvgl(imageId id, lumin_native &avgl) = 0;
 
-  static void sigFromImage(Image *image, imageId id, ImgData *sig);
+  static void sigFromImage(const Image &image, imageId id, ImgData *sig);
 
   template <typename B>
   class bucket_set {
