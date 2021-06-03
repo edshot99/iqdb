@@ -187,9 +187,9 @@ bool dbSpaceCommon::isImageGrayscale(imageId id) {
 }
 
 void dbSpaceCommon::sigFromImage(Image *image, imageId id, ImgData *sig) {
-  AutoCleanArray<unsigned char> rchan(NUM_PIXELS * NUM_PIXELS);
-  AutoCleanArray<unsigned char> gchan(NUM_PIXELS * NUM_PIXELS);
-  AutoCleanArray<unsigned char> bchan(NUM_PIXELS * NUM_PIXELS);
+  std::vector<unsigned char> rchan(NUM_PIXELS * NUM_PIXELS);
+  std::vector<unsigned char> gchan(NUM_PIXELS * NUM_PIXELS);
+  std::vector<unsigned char> bchan(NUM_PIXELS * NUM_PIXELS);
 
   sig->id = id;
   sig->width = 0;
@@ -203,19 +203,22 @@ void dbSpaceCommon::sigFromImage(Image *image, imageId id, ImgData *sig) {
     image = resized;
   }
 
-  unsigned char *red = rchan.ptr(), *green = gchan.ptr(), *blue = bchan.ptr();
-  for (int **row = image->tpixels; row < image->tpixels + NUM_PIXELS; row++)
-    for (int *col = *row, *end = *row + NUM_PIXELS; col < end; col++) {
-      *red++ = gdTrueColorGetRed(*col);
-      *green++ = gdTrueColorGetGreen(*col);
-      *blue++ = gdTrueColorGetBlue(*col);
+  for (int y = 0; y < NUM_PIXELS; y++) {
+    for (int x = 0; x < NUM_PIXELS; x++) {
+      // https://libgd.github.io/manuals/2.3.1/files/gd-c.html#gdImageGetPixel
+      // https://libgd.github.io/manuals/2.3.1/files/gd-h.html#gdTrueColorGetRed
+      int pixel = gdImageGetPixel(image, x, y);
+      rchan[x + y * NUM_PIXELS] = gdTrueColorGetRed(pixel);
+      gchan[x + y * NUM_PIXELS] = gdTrueColorGetGreen(pixel);
+      bchan[x + y * NUM_PIXELS] = gdTrueColorGetBlue(pixel);
     }
+  }
 
-  AutoCleanArray<Unit> cdata1(NUM_PIXELS * NUM_PIXELS);
-  AutoCleanArray<Unit> cdata2(NUM_PIXELS * NUM_PIXELS);
-  AutoCleanArray<Unit> cdata3(NUM_PIXELS * NUM_PIXELS);
-  transformChar(rchan.ptr(), gchan.ptr(), bchan.ptr(), cdata1.ptr(), cdata2.ptr(), cdata3.ptr());
-  calcHaar(cdata1.ptr(), cdata2.ptr(), cdata3.ptr(), sig->sig1, sig->sig2, sig->sig3, sig->avglf);
+  std::vector<Unit> cdata1(NUM_PIXELS * NUM_PIXELS);
+  std::vector<Unit> cdata2(NUM_PIXELS * NUM_PIXELS);
+  std::vector<Unit> cdata3(NUM_PIXELS * NUM_PIXELS);
+  transformChar(rchan.data(), gchan.data(), bchan.data(), cdata1.data(), cdata2.data(), cdata3.data());
+  calcHaar(cdata1.data(), cdata2.data(), cdata3.data(), sig->sig1, sig->sig2, sig->sig3, sig->avglf);
 }
 
 template <typename B>
@@ -354,9 +357,9 @@ void dbSpaceImpl::load(const char *filename) {
     itr->reserve(f.read<count_t>());
   DEBUG_CONT(imgdb)(DEBUG_OUT, "bucket sizes done at %llx... ", (long long)firstOff);
 
-  // read IDs (for verification only)
-  AutoCleanArray<imageId> ids(numImg);
-  f.read(ids.ptr(), numImg);
+  // read IDs (for verification only).
+  std::vector<imageId> ids(numImg);
+  f.read(ids.data(), numImg);
 
   // read sigs
   f.seekg(firstOff);
@@ -368,7 +371,7 @@ void dbSpaceImpl::load(const char *filename) {
     size_t ind = m_nextIndex++;
     imgbuckets.add(sig, ind);
 
-    if (ids[ind] != sig.id) {
+    if (ids.at(ind) != sig.id) {
       DEBUG(warnings)("WARNING: index %zd DB header ID %08llx mismatch with sig ID %08llx.\n", ind, (long long)ids[ind], (long long)sig.id);
     }
 
@@ -610,7 +613,7 @@ sim_vector dbSpaceImpl::do_query(queryArg q, int num_colors) {
     throw usage_error("Can't query with invalid buckets.");
 
   size_t count = m_nextIndex;
-  AutoCleanArray<Score> scores(count);
+  std::vector<Score> scores(count, 0);
 
   // Luminance score (DC coefficient).
   for (imageIterator itr = image_begin(); itr != image_end(); ++itr) {
@@ -640,8 +643,7 @@ sim_vector dbSpaceImpl::do_query(queryArg q, int num_colors) {
 #if QUERYSTATS
   size_t coefcnt = 0, coeflen = 0, coefmax = 0;
   size_t setcnt[NUM_COEFS * num_colors];
-  AutoCleanArray<uint8_t> counts(count);
-  memset(counts.ptr(), 0, sizeof(counts[0]) * count);
+  std::vector<unit8_t> counts(count, 0);
   memset(setcnt, 0, sizeof(setcnt));
 #endif
   int flag_fast = 0;

@@ -98,24 +98,4 @@ private:
   T *m_p;
 };
 
-template <typename T>
-class AutoCleanArray {
-public:
-  explicit AutoCleanArray(size_t count) : m_p(new T[count]) {}
-  ~AutoCleanArray() {
-    delete[] m_p;
-    m_p = NULL;
-  }
-
-  T *ptr() { return m_p; }
-
-  T &operator[](size_t ind) { return m_p[ind]; }
-
-private:
-  AutoCleanArray(const AutoCleanArray &);
-  AutoCleanArray &operator=(const AutoCleanArray &);
-
-  T *m_p;
-};
-
 #endif // AUTO_CLEAN_H
