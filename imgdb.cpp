@@ -438,13 +438,13 @@ void dbSpaceAlter::load(const char *filename) {
   }
 }
 
-dbSpace *dbSpace::load_file(const char *filename, int mode) {
-  dbSpace* db;
+std::unique_ptr<dbSpace> dbSpace::load_file(const char *filename, int mode) {
+  std::unique_ptr<dbSpace> db;
 
   if (mode == dbSpaceCommon::mode_mask_alter) {
-    db = new dbSpaceAlter(filename);
+    db = std::make_unique<dbSpaceAlter>(filename);
   } else if (mode == dbSpaceCommon::mode_mask_simple) {
-    db = new dbSpaceImpl();
+    db = std::make_unique<dbSpaceImpl>();
   } else {
     throw usage_error("Unsupported database mode");
   }

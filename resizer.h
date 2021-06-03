@@ -22,8 +22,6 @@
 #include <gd.h>
 #include <memory>
 
-#include "auto_clean.h"
-
 enum image_types { IMG_UNKNOWN, IMG_JPEG };
 
 typedef std::unique_ptr<gdImage, decltype(&gdImageDestroy)> Image;

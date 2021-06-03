@@ -50,7 +50,6 @@ different but the majority of the actual code is the same for both types.
 #include <fstream>
 #include <iostream>
 
-#include "auto_clean.h"
 #include "delta_queue.h"
 #include "haar.h"
 #include "imgdb.h"

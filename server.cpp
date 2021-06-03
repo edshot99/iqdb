@@ -20,8 +20,8 @@
 
 #include <cstddef>
 #include <string>
+#include <memory>
 
-#include "auto_clean.h"
 #define DEBUG_IQDB
 #include "debug.h"
 #include "imgdb.h"
@@ -31,32 +31,9 @@
 
 using nlohmann::json;
 using httplib::Server;
+using imgdb::dbSpace;
 
 extern int debug_level;
-
-class dbSpaceAuto : public AutoCleanPtr<imgdb::dbSpace> {
-public:
-  dbSpaceAuto(){};
-  dbSpaceAuto(const char *filename, int mode) : AutoCleanPtr<imgdb::dbSpace>(loaddb(filename, mode)), m_filename(filename){};
-
-  void save() { (*this)->save_file(m_filename.c_str()); }
-  void load(const char *filename, int mode) {
-    this->set(loaddb(filename, mode));
-    m_filename = filename;
-  }
-  void clear() { this->set(NULL); }
-
-  const std::string &filename() const { return m_filename; }
-
-private:
-  static imgdb::dbSpace *loaddb(const char *fn, int mode) {
-    imgdb::dbSpace *db = imgdb::dbSpace::load_file(fn, mode);
-    DEBUG(summary)("Database loaded from %s, has %zd images.\n", fn, db->getImgCount());
-    return db;
-  }
-
-  std::string m_filename;
-};
 
 #ifdef INTMATH
 #define ScD(x) ((double)(x) / imgdb::ScoreMax)
@@ -84,8 +61,8 @@ void install_signal_handlers() {
 void http_server(const std::string host, const int port, const std::string database_filename) {
   DEBUG(summary)("Starting server...\n");
 
-  dbSpaceAuto memory_db(database_filename.c_str(), imgdb::dbSpace::mode_simple);
-  dbSpaceAuto file_db(database_filename.c_str(), imgdb::dbSpace::mode_alter);
+  auto memory_db = dbSpace::load_file(database_filename.c_str(), dbSpace::mode_simple);
+  auto file_db = dbSpace::load_file(database_filename.c_str(), dbSpace::mode_alter);
 
   install_signal_handlers();
 
@@ -103,7 +80,7 @@ void http_server(const std::string host, const int port, const std::string datab
     memory_db->addImageData(&signature);
 
     file_db->addImageData(&signature);
-    file_db.save();
+    file_db->save_file(NULL);
 
     json data = {
       { "id", signature.id },
@@ -123,7 +100,7 @@ void http_server(const std::string host, const int port, const std::string datab
 
     if (file_db->hasImage(post_id)) {
       file_db->removeImage(post_id);
-      file_db.save();
+      file_db->save_file(NULL);
     }
 
     json data = {

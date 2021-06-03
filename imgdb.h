@@ -32,6 +32,7 @@
 
 // STL includes
 #include <map>
+#include <memory>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
@@ -211,7 +212,7 @@ public:
   static const int mode_simple = 0x02;   // Fast queries, less memory, cannot save, no image ID queries.
   static const int mode_alter = 0x04;    // Fast add/remove/info on existing DB file, no queries.
 
-  static dbSpace *load_file(const char *filename, int mode);
+  static std::unique_ptr<dbSpace> load_file(const char *filename, int mode);
   virtual void save_file(const char *filename) = 0;
 
   virtual ~dbSpace();
