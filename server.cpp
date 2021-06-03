@@ -151,8 +151,6 @@ void http_server(const std::string host, const int port, const std::string datab
       data += {
           {"id", match.id},
           {"score", ScD(match.score)},
-          {"width", match.width},
-          {"height", match.height},
       };
     }
 

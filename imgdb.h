@@ -156,25 +156,16 @@ typedef struct {
 } lumin_native;
 
 struct sim_value {
-  sim_value(imageId i, Score s, unsigned int w, unsigned int h) : id(i), score(s), width(w), height(h) {}
+  sim_value(imageId i, Score s) : id(i), score(s) {}
   imageId id;
   Score score;
-  unsigned int width, height;
 };
 
 struct image_info {
   image_info() {}
-  image_info(imageId i, const lumin_native &a, int w, int h) : id(i), avgl(a), width(w), height(h) {}
+  image_info(imageId i, const lumin_native &a) : id(i), avgl(a) {}
   imageId id;
   lumin_native avgl;
-  union {
-    uint16_t width;
-    uint16_t set;
-  };
-  union {
-    uint16_t height;
-    uint16_t mask;
-  };
 
   static void avglf2i(const double avglf[3], lumin_native &avgl) {
     for (int c = 0; c < 3; c++) {
@@ -198,8 +189,8 @@ struct ImgData {
   sig_t sig3;      /* Q positions with largest magnitude */
   double avglf[3]; /* YIQ for position [0,0] */
   /* image properties extracted when opened for the first time */
-  res_t width;  /* in pixels */
-  res_t height; /* in pixels */
+  res_t width;  /* in pixels (unused) */
+  res_t height; /* in pixels (unused) */
 };
 
 class dbSpace;
@@ -237,8 +228,6 @@ public:
   // Stats.
   virtual size_t getImgCount() = 0;
   virtual bool hasImage(imageId id) = 0;
-  virtual int getImageHeight(imageId id) = 0;
-  virtual int getImageWidth(imageId id) = 0;
   virtual bool isImageGrayscale(imageId id) = 0;
   virtual imageId_list getImgIdList() = 0;
 

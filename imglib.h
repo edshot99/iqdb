@@ -184,8 +184,6 @@ public:
 
   void init(const ImgData *nsig) {
     id = nsig->id;
-    height = nsig->height;
-    width = nsig->width;
     avglf2i(nsig->avglf, avgl);
   }
 };
@@ -207,10 +205,6 @@ struct imageIterator : public std::vector<image_info>::iterator {
   SigStruct *sig() const { throw usage_error("Not valid in read-only mode."); }
   size_t index() const; // implemented below
   const lumin_native &avgl() const { return (*this)->avgl; }
-  int width() const { return (*this)->width; }
-  int height() const { return (*this)->height; }
-  uint16_t set() const { return (*this)->set; }
-  uint16_t mask() const { return (*this)->mask; }
   size_t cOfs() const { return index() * sizeof(ImgData); }
 
   dbSpaceImpl &m_db;
@@ -339,8 +333,6 @@ public:
   // Stats.
   virtual size_t getImgCount();
   virtual bool hasImage(imageId id);
-  virtual int getImageHeight(imageId id);
-  virtual int getImageWidth(imageId id);
   virtual imageId_list getImgIdList();
 
   // DB maintenance.
@@ -402,8 +394,6 @@ public:
   // Stats. Partially unsupported.
   virtual size_t getImgCount();
   virtual bool hasImage(imageId id);
-  virtual int getImageHeight(imageId id);
-  virtual int getImageWidth(imageId id);
   virtual imageId_list getImgIdList();
 
   // DB maintenance.

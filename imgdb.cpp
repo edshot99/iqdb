@@ -176,22 +176,6 @@ inline ImgData dbSpaceAlter::get_sig(size_t ind) {
   return sig;
 }
 
-int dbSpaceImpl::getImageWidth(imageId id) {
-  return find(id).width();
-}
-
-int dbSpaceImpl::getImageHeight(imageId id) {
-  return find(id).height();
-}
-
-int dbSpaceAlter::getImageWidth(imageId id) {
-  return get_sig(find(id)->second).width;
-}
-
-int dbSpaceAlter::getImageHeight(imageId id) {
-  return get_sig(find(id)->second).height;
-}
-
 inline bool dbSpaceCommon::is_grayscale(const lumin_native &avgl) {
   return std::abs(avgl.v[1]) + std::abs(avgl.v[2]) < MakeScore(6) / 1000;
 }
@@ -208,8 +192,8 @@ void dbSpaceCommon::sigFromImage(Image *image, imageId id, ImgData *sig) {
   AutoCleanArray<unsigned char> bchan(NUM_PIXELS * NUM_PIXELS);
 
   sig->id = id;
-  sig->width = image->sx;
-  sig->height = image->sy;
+  sig->width = 0;
+  sig->height = 0;
 
   AutoGDImage resized;
   if (image->sx != NUM_PIXELS || image->sy != NUM_PIXELS || !gdImageTrueColor(image)) {
@@ -293,8 +277,6 @@ void dbSpaceImpl::addImageData(const ImgData *img) {
   }
   m_info.at(ind).id = img->id;
   SigStruct::avglf2i(img->avglf, m_info[ind].avgl);
-  m_info[ind].width = img->width;
-  m_info[ind].height = img->height;
   m_images.add_index(img->id, ind);
 
   imgbuckets.add(*img, ind);
@@ -392,8 +374,6 @@ void dbSpaceImpl::load(const char *filename) {
 
     m_info[ind].id = sig.id;
     SigStruct::avglf2i(sig.avglf, m_info[ind].avgl);
-    m_info[ind].width = sig.width;
-    m_info[ind].height = sig.height;
 
     m_images.add_index(sig.id, ind);
   }
@@ -733,9 +713,6 @@ sim_vector dbSpaceImpl::do_query(queryArg q, int num_colors) {
 #endif
     pqResults.push(sim_result(scores[itr.index()], itr));
 
-    int flag_uniqueset = 0;
-    if (flag_uniqueset) //{
-      need += ++sets[itr.set()] > 1;
     //imageIterator top(pqResults.top(), *this);fprintf(stderr, "Added id=%08lx score=%.2f set=%x, now need %d. Worst is id %08lx score %.2f set %x has %zd\n", itr.id(), (double)scores[itr.index()]/ScoreMax, itr.set(), need, top.id(), (double)pqResults.top().score/ScoreMax, top.set(), sets[top.set()]); }
     ++itr;
   }
@@ -751,22 +728,9 @@ sim_vector dbSpaceImpl::do_query(queryArg q, int num_colors) {
         continue;
 
       // Make room by dropping largest entry:
-      int flag_uniqueset = 0;
-      if (flag_uniqueset) {
-        pqResults.push(sim_result(scores[itr.index()], itr));
-        need += ++sets[itr.set()] > 1;
-        //imageIterator top(pqResults.top(), *this);fprintf(stderr, "Added id=%08lx score=%.2f set=%x, now need %d. Worst is id %08lx score %.2f set %x has %zd\n", itr.id(), (double)scores[itr.index()]/ScoreMax, itr.set(), need, top.id(), (double)pqResults.top().score/ScoreMax, top.set(), sets[top.set()]);
-
-        while (pqResults.size() > need || sets[imageIterator(pqResults.top(), *this).set()] > 1) {
-          need -= sets[imageIterator(pqResults.top(), *this).set()]-- > 1;
-          pqResults.pop();
-          //imageIterator top(pqResults.top(), *this);fprintf(stderr, "Dropped worst, now need %d. New worst is id %08lx score %.2f set %x has %zd\n", need, top.id(), (double)pqResults.top().score/ScoreMax, top.set(), sets[top.set()]);
-        }
-      } else {
-        pqResults.pop();
-        // Insert new entry:
-        pqResults.push(sim_result(scores[itr.index()], itr));
-      }
+      pqResults.pop();
+      // Insert new entry:
+      pqResults.push(sim_result(scores[itr.index()], itr));
     }
   }
 
@@ -779,9 +743,7 @@ sim_vector dbSpaceImpl::do_query(queryArg q, int num_colors) {
 
     imageIterator itr(curResTmp, *this);
     //fprintf(stderr, "Candidate %08lx = %.2f, set %x has %zd.\n", itr.id(), ScD(curResTmp.score), itr.set(), sets[itr.set()]);
-    int flag_uniqueset = 0;
-    if (!flag_uniqueset || sets[itr.set()]-- < 2)
-      V.push_back(sim_value(itr.id(), DScSc(((DScore)curResTmp.score) * 100 * scale), itr.width(), itr.height()));
+    V.push_back(sim_value(itr.id(), DScSc(((DScore)curResTmp.score) * 100 * scale)));
     //else fprintf(stderr, "Skipped!\n");
     pqResults.pop();
   }
