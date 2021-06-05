@@ -40,37 +40,12 @@ To be treated as a constant.
 unsigned char imgBin[NUM_PIXELS * NUM_PIXELS];
 int imgBinInited = 0;
 
-inline void mapped_file::unmap() {
-  if (!m_base)
-    return;
-  if (munmap(m_base, m_length))
-    ERROR("Could not unmap %zd bytes of memory.\n", m_length);
-}
-
-void imageIdIndex_list::set_base() {
-  if (!m_base.empty())
-    return;
-
-  if (m_tail.base_size() * 17 / 16 + 16 < m_tail.base_capacity()) {
-    container copy;
-    copy.reserve(m_tail.base_size(), true);
-    for (container::iterator itr = m_tail.begin(); itr != m_tail.end(); ++itr)
-      copy.push_back(*itr);
-
-    m_base.swap(copy);
-    copy = container();
-    m_tail.swap(copy);
-  } else {
-    m_base.swap(m_tail);
-  }
-}
-
 // Specializations accessing images as SigStruct* or size_t map, and imageIdIndex_map as imageId or index map.
 inline imageIterator dbSpaceImpl::image_begin() { return imageIterator(m_info.begin(), *this); }
 inline imageIterator dbSpaceImpl::image_end() { return imageIterator(m_info.end(), *this); }
 
 inline imageIterator dbSpaceImpl::find(imageId i) {
-  map_iterator itr = m_images.find(i);
+  auto itr = m_images.find(i);
   if (itr == m_images.end())
     throw invalid_id("Invalid image ID.");
   return imageIterator(itr, *this);
@@ -161,7 +136,7 @@ ImgData::ImgData(const std::string blob, imageId imgId) {
 template <typename B>
 inline void dbSpaceCommon::bucket_set<B>::add(const ImgData &nsig, count_t index) {
   lumin_native avgl;
-  SigStruct::avglf2i(nsig.avglf, avgl);
+  image_info::avglf2i(nsig.avglf, avgl);
   for (int i = 0; i < NUM_COEFS; i++) { // populate buckets
 
     //imageId_array3 (imgbuckets = dbSpace[dbId]->(imgbuckets;
@@ -216,7 +191,7 @@ void dbSpaceImpl::addImageData(const ImgData *img) {
     m_info.resize(ind + 1);
   }
   m_info.at(ind).id = img->id;
-  SigStruct::avglf2i(img->avglf, m_info[ind].avgl);
+  image_info::avglf2i(img->avglf, m_info[ind].avgl);
   m_images.add_index(img->id, ind);
 
   imgbuckets.add(*img, ind);
@@ -261,7 +236,7 @@ void dbSpaceImpl::load(const char *filename) {
 
   uint32_t v_code = f.read<uint32_t>();
   uint32_t intsizes = v_code >> 8;
-  uint version = v_code & 0xff;
+  unsigned int version = v_code & 0xff;
 
   if (intsizes != SRZ_V_SZ) {
     throw data_error("Cannot load database with wrong endianness or data sizes");
@@ -284,13 +259,11 @@ void dbSpaceImpl::load(const char *filename) {
     imgbuckets.add(sig, ind);
 
     m_info[ind].id = sig.id;
-    SigStruct::avglf2i(sig.avglf, m_info[ind].avgl);
+    image_info::avglf2i(sig.avglf, m_info[ind].avgl);
 
     m_images.add_index(sig.id, ind);
   }
 
-  for (typename buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr)
-    itr->set_base();
   INFO("Loaded %ld images from %s!\n", getImgCount(), filename);
   f.close();
 }
@@ -312,7 +285,7 @@ void dbSpaceAlter::load(const char *filename) {
     m_f->exceptions(std::fstream::badbit | std::fstream::failbit);
 
     uint32_t v_code = m_f->read<uint32_t>();
-    uint version = v_code & 0xff;
+    unsigned int version = v_code & 0xff;
 
     if ((v_code >> 8) == 0) {
       WARN("Old database version.\n");
@@ -545,15 +518,8 @@ sim_vector dbSpaceImpl::queryFromSignature(const ImgData &signature, size_t numr
       Score weight = weights[imgBin[idx]][c];
       scale -= weight;
 
-      // update the score of every image which has this coef
-      AutoImageIdIndex_map map(bucket.map_all());
-
-      for (auto itr(map.begin()); itr != map.end(); ++itr) {
-        scores[itr.get_index()] -= weight;
-      }
-
-      for (imageIdIndex_list::container::const_iterator itr(bucket.tail().begin()); itr != bucket.tail().end(); ++itr) {
-        scores[itr.get_index()] -= weight;
+      for (auto index : bucket) {
+        scores[index] -= weight;
       }
     }
   }
@@ -612,7 +578,7 @@ void dbSpaceAlter::removeImage(imageId id) {
 template <typename B>
 inline void dbSpaceCommon::bucket_set<B>::remove(const ImgData &nsig) {
   lumin_native avgl;
-  SigStruct::avglf2i(nsig.avglf, avgl);
+  image_info::avglf2i(nsig.avglf, avgl);
   for (int i = 0; 0 && i < NUM_COEFS; i++) {
     if (nsig.sig1[i] > 0)
       buckets[0][0][nsig.sig1[i]].remove(nsig.id);

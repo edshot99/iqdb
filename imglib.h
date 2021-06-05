@@ -50,7 +50,6 @@ different but the majority of the actual code is the same for both types.
 #include <fstream>
 #include <iostream>
 
-#include "delta_queue.h"
 #include "haar.h"
 #include "imgdb.h"
 #include "resizer.h"
@@ -58,8 +57,6 @@ different but the majority of the actual code is the same for both types.
 namespace imgdb {
 
 class dbSpaceImpl;
-
-typedef unsigned int uint;
 
 // Weights for the Haar coefficients.
 // Straight from the referenced paper:
@@ -72,109 +69,6 @@ const float weights[6][3] =
      {0.52f, 0.53f, 0.14f},   // 3    1.19      7
      {0.47f, 0.28f, 0.18f},   // 4    0.93      9
      {0.30f, 0.14f, 0.27f}};  // 5    0.71      16384-25=16359
-
-union image_id_index {
-  imageId id;
-  size_t index;
-  image_id_index(imageId i) : id(i) {}
-  image_id_index(size_t ind, bool) : index(ind) {}
-  image_id_index() {}
-  bool operator==(const image_id_index &other) const { return id == other.id; }
-  bool operator!=(const image_id_index &other) const { return id != other.id; }
-
-  operator size_t &() { return index; }
-};
-
-typedef std::vector<image_id_index> IdIndex_list;
-
-struct map_iterator : public delta_iterator {
-  typedef delta_iterator base_type;
-
-  map_iterator(const size_t *idx) : base_type((delta_value *)idx) {}
-  map_iterator(const base_type &itr) : base_type(itr) {}
-  map_iterator() {}
-
-  size_t get_index() const { return **this; }
-};
-
-struct mapped_file {
-  mapped_file() : m_base(NULL) {}
-  mapped_file(void *base, size_t len) : m_base(base), m_length(len) {}
-
-  void unmap();
-
-  void *m_base;
-  size_t m_length;
-};
-
-struct imageIdIndex_map : public mapped_file {
-  imageIdIndex_map() {}
-  imageIdIndex_map(void *base, map_iterator img, map_iterator end, size_t l)
-      : mapped_file(base, l), m_img(img), m_end(end) {}
-  map_iterator begin() { return m_img; }
-  map_iterator end() { return m_end; }
-
-  map_iterator m_img;
-  map_iterator m_end;
-};
-
-// Automatically unmaps the imageIdIndex_map when it goes out of scope.
-struct AutoImageIdIndex_map : public imageIdIndex_map {
-  typedef imageIdIndex_map base_type;
-  AutoImageIdIndex_map(const imageIdIndex_map &map) : base_type(map) {}
-  ~AutoImageIdIndex_map() { base_type::unmap(); }
-};
-
-class imageIdIndex_list {
-public:
-  static const size_t threshold = 0;
-  class container : public delta_queue {
-  public:
-    struct const_iterator : public delta_iterator {
-      const_iterator(const delta_iterator &itr) : delta_iterator(itr) {}
-      size_t get_index() const { return **this; }
-    };
-  };
-
-  imageIdIndex_map map_all() { return imageIdIndex_map(NULL, m_base.begin(), m_base.end(), 0); };
-  bool empty() { return m_tail.empty() && m_base.empty(); }
-  size_t size() { return m_tail.size() + m_base.size(); }
-  void reserve(size_t num) {
-    if (num > m_base.size())
-      m_tail.reserve(num - m_base.size());
-  }
-  void set_base();
-  void push_back(image_id_index i) { m_tail.push_back(i.index); }
-  void remove(image_id_index i); // unimplemented.
-
-  const container &tail() { return m_tail; }
-
-  static int fd() { return -1; }
-
-protected:
-  container m_tail;
-  container m_base;
-};
-
-/* in memory signature structure */
-class SigStruct : public image_info {
-public:
-  size_t index; /* index into score array for queries */
-
-  size_t cacheOfs;
-
-  SigStruct(size_t ofs) : cacheOfs(ofs){};
-
-  SigStruct(){};
-
-  ~SigStruct() {
-  }
-
-  void init(const ImgData *nsig) {
-    id = nsig->id;
-    avglf2i(nsig->avglf, avgl);
-  }
-};
 
 class sigMap : public std::unordered_map<imageId, size_t> {
 public:
@@ -190,10 +84,8 @@ struct imageIterator : public std::vector<image_info>::iterator {
   imageIterator(const sigMap::iterator &itr, dbSpaceImpl &db); // implemented below
 
   imageId id() const { return (*this)->id; }
-  SigStruct *sig() const { throw usage_error("Not valid in read-only mode."); }
   size_t index() const; // implemented below
   const lumin_native &avgl() const { return (*this)->avgl; }
-  size_t cOfs() const { return index() * sizeof(ImgData); }
 
   dbSpaceImpl &m_db;
 };
@@ -314,8 +206,6 @@ public:
   virtual void removeImage(imageId id) override;
 
 private:
-  typedef typename sigMap::iterator map_iterator;
-
   friend struct imageIterator;
 
   std::vector<image_info> &info() { return m_info; }
@@ -337,11 +227,12 @@ private:
 	   R=0/G=1/B=2, pos=0/neg=1, (i*NUM_PIXELS+j)
 	 */
 
-  struct bucket_type : public imageIdIndex_list {
-    typedef imageIdIndex_list base_type;
-    void add(image_id_index id, count_t index) { base_type::push_back(image_id_index(index, true)); }
-    void remove(image_id_index id) { base_type::remove(id); }
+  // XXX We use a uint32_t here to reduce memory consumption.
+  struct bucket_type : public std::vector<uint32_t> {
+    void add(imageId id, count_t index) { push_back(index); }
+    void remove(imageId id) { throw usage_error("remove not implemented"); }
   };
+
   typedef bucket_set<bucket_type> buckets_t;
   buckets_t imgbuckets;
 };
@@ -379,8 +270,8 @@ private:
   void move_deleted();
 
   struct bucket_type {
-    void add(image_id_index id, count_t index) { size++; }
-    void remove(image_id_index id) { size--; }
+    void add(imageId id, count_t index) { size++; }
+    void remove(imageId id) { size--; }
 
     count_t size;
   };
