@@ -21,6 +21,8 @@
 #include <cstddef>
 #include <string>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 
 #define DEBUG_IQDB
 #include "debug.h"
@@ -61,12 +63,15 @@ void install_signal_handlers() {
 void http_server(const std::string host, const int port, const std::string database_filename) {
   DEBUG(summary)("Starting server...\n");
 
+  std::shared_mutex mutex_;
   auto memory_db = dbSpace::load_file(database_filename.c_str(), dbSpace::mode_simple);
   auto file_db = dbSpace::load_file(database_filename.c_str(), dbSpace::mode_alter);
 
   install_signal_handlers();
 
   server.Post("/images/(\\d+)", [&](const auto &request, auto &response) {
+    std::unique_lock lock(mutex_);
+
     if (!request.has_file("file"))
       throw imgdb::param_error("`POST /images/:id` requires a `file` param");
 
@@ -92,6 +97,8 @@ void http_server(const std::string host, const int port, const std::string datab
   });
 
   server.Delete("/images/(\\d+)", [&](const auto &request, auto &response) {
+    std::unique_lock lock(mutex_);
+
     const imgdb::imageId post_id = std::stoi(request.matches[1]);
 
     if (memory_db->hasImage(post_id)) {
@@ -111,6 +118,8 @@ void http_server(const std::string host, const int port, const std::string datab
   });
 
   server.Post("/query", [&](const auto &request, auto &response) {
+    std::shared_lock lock(mutex_);
+
     int limit = 10;
     json data;
 
@@ -135,8 +144,11 @@ void http_server(const std::string host, const int port, const std::string datab
   });
 
   server.Get("/status", [&](const auto &request, auto &response) {
+    std::shared_lock lock(mutex_);
+
     const int count = memory_db->getImgCount();
     json data = {{"images", count}};
+
     response.set_content(data.dump(4), "application/json");
   });
 
