@@ -78,17 +78,14 @@ void http_server(const std::string host, const int port, const std::string datab
       throw imgdb::duplicate_id("Image already in database.");
 
     const auto &file = request.get_file_value("file");
-    imgdb::ImgData signature;
-    memory_db->imgDataFromBlob(file.content.c_str(), file.content.size() - 1, post_id, &signature);
-    memory_db->addImageData(&signature);
 
+    imgdb::ImgData signature(file.content, post_id);
+    memory_db->addImageData(&signature);
     file_db->addImageData(&signature);
     file_db->save_file(NULL);
 
     json data = {
       { "id", signature.id },
-      { "width", signature.width },
-      { "height", signature.height },
     };
 
     response.set_content(data.dump(4), "application/json");
@@ -128,8 +125,7 @@ void http_server(const std::string host, const int port, const std::string datab
       limit = stoi(request.get_param_value("limit"));
 
     const auto &file = request.get_file_value("file");
-    const imgdb::queryArg query(file.content.c_str(), file.content.size() - 1, limit);
-    const auto matches = memory_db->queryImg(query);
+    const auto matches = memory_db->queryFromBlob(file.content, limit);
 
     for (const auto &match : matches) {
       data += {

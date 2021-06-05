@@ -39,6 +39,7 @@
 
 // Haar transform defines
 #include "haar.h"
+#include "resizer.h"
 
 namespace imgdb {
 
@@ -180,10 +181,11 @@ struct image_info {
 };
 
 typedef std::vector<sim_value> sim_vector;
-typedef std::vector<imageId> imageId_list;
 typedef Idx sig_t[NUM_COEFS];
 
 struct ImgData {
+  ImgData() {};
+  ImgData(const std::string blob, imageId id);
   imageId id;      /* picture id */
   sig_t sig1;      /* Y positions with largest magnitude */
   sig_t sig2;      /* I positions with largest magnitude */
@@ -200,11 +202,10 @@ class db_ofstream;
 
 // Standard query arguments.
 struct queryArg {
-  queryArg(const void *data, size_t data_size, unsigned int numres);
+  queryArg(const ImgData &img);
 
   sig_t sig[3];
   lumin_native avgl;
-  unsigned int numres;
 };
 
 class dbSpace {
@@ -218,30 +219,17 @@ public:
   virtual ~dbSpace();
 
   // Image queries.
-  virtual sim_vector queryImg(const queryArg &query) = 0;
-
-  // Image data.
-  static void imgDataFromBlob(const void *data, size_t data_size, imageId id, ImgData *img);
-
-  // Initialize sig and avgl of the queryArg.
-  static void queryFromImgData(const ImgData &img, queryArg *query);
+  virtual sim_vector queryFromSignature(const ImgData& img, size_t numres = 10) = 0;
+  virtual sim_vector queryFromBlob(const std::string blob, int numres = 10);
 
   // Stats.
   virtual size_t getImgCount() = 0;
   virtual bool hasImage(imageId id) = 0;
-  virtual bool isImageGrayscale(imageId id) = 0;
-  virtual imageId_list getImgIdList() = 0;
 
   // DB maintenance.
-  virtual void addImageBlob(imageId id, const void *blob, size_t length) = 0;
   virtual void addImageData(const ImgData *img) = 0;
 
   virtual void removeImage(imageId id) = 0;
-  virtual void rehash() = 0;
-
-  // Similarity.
-  virtual Score calcAvglDiff(imageId id1, imageId id2) = 0;
-  virtual Score calcSim(imageId id1, imageId id2, bool ignore_color = false) = 0;
 
 protected:
   dbSpace();
@@ -252,19 +240,9 @@ private:
   void operator=(const dbSpace &);
 };
 
-// Inline implementations.
-inline void dbSpace::queryFromImgData(const ImgData &img, queryArg *query) {
-  if (sizeof(query->sig) != ((char *)(img.sig3 + NUM_COEFS) - (char *)img.sig1))
-    throw internal_error("query sigs and ImgData sigs packing differs.");
-
-  memcpy(query->sig, img.sig1, sizeof(query->sig));
-  image_info::avglf2i(img.avglf, query->avgl);
-}
-
-inline queryArg::queryArg(const void *data, size_t data_size, unsigned int nr) : numres(nr) {
-  ImgData img;
-  dbSpace::imgDataFromBlob(data, data_size, 0, &img);
-  dbSpace::queryFromImgData(img, this);
+inline queryArg::queryArg(const ImgData &img) {
+  memcpy(sig, img.sig1, sizeof(sig));
+  image_info::avglf2i(img.avglf, avgl);
 }
 
 } // namespace imgdb

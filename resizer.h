@@ -19,6 +19,9 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 \**************************************************************************/
 
+#ifndef IQDB_RESIZER_H
+#define IQDB_RESIZER_H
+
 #include <gd.h>
 #include <memory>
 
@@ -31,3 +34,5 @@ image_types get_image_info(const unsigned char *data, size_t length);
 // Take image data at given memory location and length, and resize
 // to thu_x*thu_y and return it.
 Image resize_image_data(const unsigned char *data, size_t len, unsigned int thu_x, unsigned int thu_y);
+
+#endif

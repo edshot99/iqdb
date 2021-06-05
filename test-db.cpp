@@ -106,6 +106,7 @@ void check(imgdb::dbSpace *db, int range, const deleted_t &removed) {
   for (deleted_t::const_iterator itr = removed.begin(); itr != removed.end(); ++itr)
     ids[itr->first] = 2;
 
+  /*
   imgdb::imageId_list imgs = db->getImgIdList();
   for (imgdb::imageId_list::const_iterator itr = imgs.begin(); itr != imgs.end(); ++itr) {
     id_map::iterator img = ids.find(*itr);
@@ -118,6 +119,7 @@ void check(imgdb::dbSpace *db, int range, const deleted_t &removed) {
     else
       img->second = 1;
   }
+  */
 
   for (id_map::iterator itr = ids.begin(); itr != ids.end(); ++itr)
     if (itr->second == 0)

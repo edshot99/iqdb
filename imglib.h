@@ -260,25 +260,12 @@ public:
 // Common function used by all implementations.
 class dbSpaceCommon : public dbSpace {
 public:
-  virtual void addImageBlob(imageId id, const void *blob, size_t length);
-
-  static void imgDataFromBlob(const void *data, size_t data_size, imageId id, ImgData *img);
-
   static bool is_grayscale(const lumin_native &avgl);
-
-  virtual bool isImageGrayscale(imageId id);
-  virtual Score calcAvglDiff(imageId id1, imageId id2);
-  virtual Score calcSim(imageId id1, imageId id2, bool ignore_color = false);
 
   static const int mode_mask_simple = 0x02;
   static const int mode_mask_alter = 0x04;
 
 protected:
-  virtual void getImgDataByID(imageId id, ImgData *img) = 0;
-  virtual void getImgAvgl(imageId id, lumin_native &avgl) = 0;
-
-  static void sigFromImage(const Image &image, imageId id, ImgData *sig);
-
   template <typename B>
   class bucket_set {
   public:
@@ -322,21 +309,18 @@ public:
   dbSpaceImpl();
   virtual ~dbSpaceImpl();
 
-  virtual void save_file(const char *filename);
+  virtual void save_file(const char *filename) override;
 
   // Image queries.
-  virtual sim_vector queryImg(const queryArg &query);
+  virtual sim_vector queryFromSignature(const ImgData& img, size_t numres = 10) override;
 
   // Stats.
-  virtual size_t getImgCount();
-  virtual bool hasImage(imageId id);
-  virtual imageId_list getImgIdList();
+  virtual size_t getImgCount() override;
+  virtual bool hasImage(imageId id) override;
 
   // DB maintenance.
-  virtual void addImageData(const ImgData *img);
-
-  virtual void removeImage(imageId id);
-  virtual void rehash();
+  virtual void addImageData(const ImgData *img) override;
+  virtual void removeImage(imageId id) override;
 
 private:
   typedef typename sigMap::iterator map_iterator;
@@ -346,15 +330,12 @@ private:
   std::vector<image_info> &info() { return m_info; }
   imageIterator find(imageId i);
 
-  virtual void load(const char *filename);
+  virtual void load(const char *filename) override;
 
   bool skip_image(const imageIterator &itr);
 
   imageIterator image_begin();
   imageIterator image_end();
-
-  void getImgDataByID(imageId id, ImgData *img) { throw usage_error("Not supported in simple mode."); }
-  void getImgAvgl(imageId id, lumin_native &avgl) { avgl = find(id).avgl(); }
 
   sigMap m_images;
 
@@ -383,23 +364,19 @@ public:
   virtual void save_file(const char *filename);
 
   // Image queries not supported.
-  virtual sim_vector queryImg(const queryArg &query) { throw usage_error("Not supported in alter mode."); }
+  virtual sim_vector queryFromSignature(const ImgData& img, size_t numres = 10) { throw usage_error("Not supported in alter mode."); }
 
   // Stats. Partially unsupported.
   virtual size_t getImgCount();
   virtual bool hasImage(imageId id);
-  virtual imageId_list getImgIdList();
 
   // DB maintenance.
   virtual void addImageData(const ImgData *img);
 
   virtual void removeImage(imageId id);
-  virtual void rehash();
 
 protected:
   sigMap::iterator find(imageId i);
-  void getImgDataByID(imageId id, ImgData *img) { *img = get_sig(m_images.find(id)->second); }
-  void getImgAvgl(imageId id, lumin_native &avgl) { image_info::avglf2i(get_sig(m_images.find(id)->second).avglf, avgl); }
   ImgData get_sig(size_t ind);
 
   virtual void load(const char *filename);
@@ -421,13 +398,11 @@ private:
 
   sigMap m_images;
   db_fstream *m_f;
-  std::string m_fname;
   offset_t m_hdrOff, m_sigOff, m_imgOff;
   typedef bucket_set<bucket_type> buckets_t;
   buckets_t m_buckets;
   DeletedList m_deleted;
   bool m_rewriteIDs;
-  bool m_readonly;
 };
 
 // Serialization constants
