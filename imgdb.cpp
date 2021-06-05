@@ -23,7 +23,6 @@
 
 #include <sys/mman.h>
 
-#include <algorithm>
 #include <memory>
 #include <vector>
 
@@ -32,13 +31,6 @@
 #include "imglib.h"
 
 namespace imgdb {
-
-/* Fixed weight mask for pixel positions (i,j).
-Each entry x = i*NUM_PIXELS + j, gets value max(i,j) saturated at 5.
-To be treated as a constant.
- */
-unsigned char imgBin[NUM_PIXELS * NUM_PIXELS];
-int imgBinInited = 0;
 
 // Specializations accessing images as SigStruct* or size_t map, and imageIdIndex_map as imageId or index map.
 inline imageIterator dbSpaceImpl::image_begin() { return imageIterator(m_info.begin(), *this); }
@@ -56,33 +48,6 @@ inline sigMap::iterator dbSpaceAlter::find(imageId i) {
   if (itr == m_images.end())
     throw invalid_id("Invalid image ID.");
   return itr;
-}
-
-void initImgBin() {
-  imgBinInited = 1;
-
-  /* setup initial fixed weights that each coefficient represents */
-  int i, j;
-
-  /*
-    0 1 2 3 4 5 6 i
-    0 0 1 2 3 4 5 5
-    1 1 1 2 3 4 5 5
-    2 2 2 2 3 4 5 5
-    3 3 3 3 3 4 5 5
-    4 4 4 4 4 4 5 5
-    5 5 5 5 5 5 5 5
-    5 5 5 5 5 5 5 5
-    j
-  */
-
-  /* Every position has value 5, */
-  memset(imgBin, 5, NUM_PIXELS_SQUARED);
-
-  /* Except for the 5 by 5 upper-left quadrant: */
-  for (i = 0; i < 5; i++)
-    for (j = 0; j < 5; j++)
-      imgBin[i * NUM_PIXELS + j] = std::max(i, j);
 }
 
 bool dbSpaceImpl::hasImage(imageId id) {
@@ -515,7 +480,8 @@ sim_vector dbSpaceImpl::queryFromSignature(const ImgData &signature, size_t numr
       if (bucket.empty())
         continue;
 
-      Score weight = weights[imgBin[idx]][c];
+      const int w = imgBin.bin[idx];
+      Score weight = weights[w][c];
       scale -= weight;
 
       for (auto index : bucket) {
@@ -666,16 +632,11 @@ dbSpace::dbSpace() {}
 dbSpace::~dbSpace() {}
 
 dbSpaceImpl::dbSpaceImpl() : m_nextIndex(0) {
-  if (!imgBinInited)
-    initImgBin();
   if (imgbuckets.count() != sizeof(imgbuckets) / sizeof(imgbuckets[0][0][0]))
     throw internal_error("bucket_set.count() is wrong!");
 }
 
 dbSpaceAlter::dbSpaceAlter(const char* filename) : m_f(NULL), m_rewriteIDs(false) {
-  if (!imgBinInited)
-    initImgBin();
-
   m_f = new db_fstream(filename);
 }
 

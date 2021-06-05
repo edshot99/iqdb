@@ -45,6 +45,7 @@ different but the majority of the actual code is the same for both types.
 #ifndef IMGDBLIB_H
 #define IMGDBLIB_H
 
+#include <algorithm>
 #include <list>
 
 #include <fstream>
@@ -69,6 +70,32 @@ const float weights[6][3] =
      {0.52f, 0.53f, 0.14f},   // 3    1.19      7
      {0.47f, 0.28f, 0.18f},   // 4    0.93      9
      {0.30f, 0.14f, 0.27f}};  // 5    0.71      16384-25=16359
+
+// A 128x128 weight mask matrix, where M[x][y] = min(max(x, y), 5). Used in
+// score calculation.
+//
+// 0 1 2 3 4 5 5 ...
+// 1 1 2 3 4 5 5 ...
+// 2 2 2 3 4 5 5 ...
+// 3 3 3 3 4 5 5 ...
+// 4 4 4 4 4 5 5 ...
+// 5 5 5 5 5 5 5 ...
+// 5 5 5 5 5 5 5 ...
+// . . . . . . .
+// . . . . . . .
+// . . . . . . .
+template <int N>
+struct ImgBin {
+  int bin[N * N];
+
+  constexpr ImgBin() : bin() {
+    for (int i = 0; i < N; i++)
+      for (int j = 0; j < N; j++)
+        bin[i * N + j] = std::min(std::max(i, j), 5);
+  }
+};
+
+constexpr static auto imgBin = ImgBin<NUM_PIXELS>();
 
 class sigMap : public std::unordered_map<imageId, size_t> {
 public:
