@@ -19,23 +19,10 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 \**************************************************************************/
 
+#include <gd.h>
 #include <memory>
-#include <errno.h>
-#include <stdio.h>
 
-#include <arpa/inet.h> // For ntoh*
-
-extern "C" {
-#include <jerror.h>
-#include <jpeglib.h>
-}
-
-#define PNG_USE_GLOBAL_ARRAYS
-#include <png.h>
-
-#define DEBUG_RESIZER
 #include "debug.h"
-
 #include "imgdb.h"
 #include "resizer.h"
 

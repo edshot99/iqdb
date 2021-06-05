@@ -21,25 +21,12 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 \**************************************************************************/
 
-/* System includes */
-#include <ctime>
-#include <errno.h>
-#include <fcntl.h>
-#include <limits>
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <time.h>
 
-/* STL includes */
 #include <algorithm>
-#include <cmath>
 #include <memory>
 #include <vector>
 
-/* iqdb includes */
 #include "debug.h"
 #include "imgdb.h"
 #include "imglib.h"
@@ -375,7 +362,6 @@ void dbSpaceImpl::load(const char *filename) {
 
   for (typename buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr)
     itr->set_base();
-  m_bucketsValid = true;
   DEBUG_CONT(imgdb)(DEBUG_OUT, "complete!\n");
   f.close();
 }
@@ -596,176 +582,86 @@ inline bool dbSpaceImpl::skip_image(const imageIterator &itr) {
   return !itr.avgl().v[0];
 }
 
-sim_vector dbSpaceImpl::do_query(queryArg q, int num_colors) {
-  int c;
+inline sim_vector
+dbSpaceImpl::queryImg(const queryArg &q) {
   Score scale = 0;
-  int sketch = 0;
-
-  if (!m_bucketsValid)
-    throw usage_error("Can't query with invalid buckets.");
-
   size_t count = m_nextIndex;
   std::vector<Score> scores(count, 0);
+  std::priority_queue<sim_result> pqResults; /* results priority queue; largest at top */
+  sim_vector V; /* output results */
+  int num_colors = is_grayscale(q.avgl) ? 1 : 3;
 
   // Luminance score (DC coefficient).
   for (imageIterator itr = image_begin(); itr != image_end(); ++itr) {
     Score s = 0;
-#ifdef DEBUG_QUERY
-    fprintf(stderr, "%zd:", itr.index());
-#endif
-    for (c = 0; c < num_colors; c++) {
-#ifdef DEBUG_QUERY
-      Score o = s;
-      fprintf(stderr, " %d=%f*abs(%f-%f)", c, ScD(weights[sketch][0][c]), ScD(itr.avgl().v[c]), ScD(q.avgl.v[c]));
-#endif
-      s += DScSc(((DScore)weights[sketch][0][c]) * std::abs(itr.avgl().v[c] - q.avgl.v[c]));
-#ifdef DEBUG_QUERY
-      fprintf(stderr, "=%f", ScD(s - o));
-#endif
+
+    for (int c = 0; c < num_colors; c++) {
+      s += DScSc(((DScore)weights[0][0][c]) * std::abs(itr.avgl().v[c] - q.avgl.v[c]));
     }
+
     scores[itr.index()] = s;
   }
 
-#ifdef DEBUG_QUERY
-  fprintf(stderr, "Lumi scores:");
-  for (int i = 0; i < count; i++)
-    fprintf(stderr, " %d=%f", i, ScD(scores[i]));
-  fprintf(stderr, "\n");
-#endif
-#if QUERYSTATS
-  size_t coefcnt = 0, coeflen = 0, coefmax = 0;
-  size_t setcnt[NUM_COEFS * num_colors];
-  std::vector<unit8_t> counts(count, 0);
-  memset(setcnt, 0, sizeof(setcnt));
-#endif
-  int flag_fast = 0;
-  int flag_nocommon = 0;
-  for (int b = flag_fast ? NUM_COEFS : 0; b < NUM_COEFS; b++) { // for every coef on a sig
-    for (c = 0; c < num_colors; c++) {
+  for (int b = 0; b < NUM_COEFS; b++) { // for every coef on a sig
+    for (int c = 0; c < num_colors; c++) {
       int idx;
       bucket_type &bucket = imgbuckets.at(c, q.sig[c][b], &idx);
+
       if (bucket.empty())
         continue;
-      if (flag_nocommon && bucket.size() > count / 10)
-        continue;
 
-      Score weight = weights[sketch][imgBin[idx]][c];
-      //fprintf(stderr, "%d:%d=%d has %zd=%f\n", b, c, idx, bucket.size(), ScD(weight));
+      Score weight = weights[0][imgBin[idx]][c];
       scale -= weight;
 
       // update the score of every image which has this coef
       AutoImageIdIndex_map map(bucket.map_all());
-#if QUERYSTATS
-      size_t len = bucket.size();
-      coeflen += len;
-      coefmax = std::max(coefmax, len);
-      coefcnt++;
-#endif
+
       for (auto itr(map.begin()); itr != map.end(); ++itr) {
         scores[itr.get_index()] -= weight;
-#if QUERYSTATS
-        counts[itr.get_index()]++;
-#endif
       }
+
       for (imageIdIndex_list::container::const_iterator itr(bucket.tail().begin()); itr != bucket.tail().end(); ++itr) {
         scores[itr.get_index()] -= weight;
-#if QUERYSTATS
-        counts[itr.get_index()]++;
-#endif
       }
     }
   }
-//fprintf(stderr, "Total scale=%f\n", ScD(scale));
-#ifdef DEBUG_QUERY
-  fprintf(stderr, "Final scores:");
-  for (int i = 0; i < count; i++)
-    fprintf(stderr, " %d=%f", i, ScD(scores[i]));
-  fprintf(stderr, "\n");
-#endif
-
-  typedef std::priority_queue<sim_result> sigPriorityQueue;
-
-  sigPriorityQueue pqResults; /* results priority queue; largest at top */
-
-  imageIterator itr = image_begin();
-
-  sim_vector V;
-
-  typedef std::map<int, size_t> set_map;
-  set_map sets;
-  unsigned int need = q.numres;
 
   // Fill up the numres-bounded priority queue (largest at top):
-  while (pqResults.size() < need && itr != image_end()) {
+  imageIterator itr = image_begin();
+  while (pqResults.size() < q.numres && itr != image_end()) {
     if (skip_image(itr)) {
       ++itr;
       continue;
     }
 
-#if QUERYSTATS
-    setcnt[counts[itr.index()]]++;
-#endif
     pqResults.push(sim_result(scores[itr.index()], itr));
 
-    //imageIterator top(pqResults.top(), *this);fprintf(stderr, "Added id=%08lx score=%.2f set=%x, now need %d. Worst is id %08lx score %.2f set %x has %zd\n", itr.id(), (double)scores[itr.index()]/ScoreMax, itr.set(), need, top.id(), (double)pqResults.top().score/ScoreMax, top.set(), sets[top.set()]); }
     ++itr;
   }
 
   for (; itr != image_end(); ++itr) {
-    // only consider if not ignored due to keywords and if is a better match than the current worst match
-#if QUERYSTATS
-    if (!skip_image(itr))
-      setcnt[counts[itr.index()]]++;
-#endif
     if (scores[itr.index()] < pqResults.top().score) {
       if (skip_image(itr))
         continue;
 
-      // Make room by dropping largest entry:
       pqResults.pop();
-      // Insert new entry:
       pqResults.push(sim_result(scores[itr.index()], itr));
     }
   }
 
-  //fprintf(stderr, "Have %zd images in result set.\n", pqResults.size());
   if (scale != 0)
     scale = ((DScore)MakeScore(1)) * MakeScore(1) / scale;
-  //fprintf(stderr, "Inverted scale=%f\n", ScD(scale));
+
   while (!pqResults.empty()) {
     const sim_result &curResTmp = pqResults.top();
 
     imageIterator itr(curResTmp, *this);
-    //fprintf(stderr, "Candidate %08lx = %.2f, set %x has %zd.\n", itr.id(), ScD(curResTmp.score), itr.set(), sets[itr.set()]);
     V.push_back(sim_value(itr.id(), DScSc(((DScore)curResTmp.score) * 100 * scale)));
-    //else fprintf(stderr, "Skipped!\n");
     pqResults.pop();
   }
 
-#if QUERYSTATS
-  size_t num = 0;
-  for (size_t i = 0; i < sizeof(setcnt) / sizeof(setcnt[0]); i++)
-    num += setcnt[i];
-  DEBUG(imgdb)("Query complete, coefcnt=%zd coeflen=%zd coefmax=%zd numset=%zd/%zd\nCounts: ", coefcnt, coeflen, coefmax, num, m_images.size());
-  num = 0;
-  for (size_t i = sizeof(setcnt) / sizeof(setcnt[0]) - 1; i > 0 && num < 10; i--)
-    if (setcnt[i]) {
-      num++;
-      DEBUG_CONT(imgdb)(DEBUG_OUT, "%zd=%zd; ", i, setcnt[i]);
-    }
-  DEBUG_CONT(imgdb)(DEBUG_OUT, "\n");
-#endif
   std::reverse(V.begin(), V.end());
-  //fprintf(stderr, "Returning %zd images, top score %f.\n", V.size(), ScD(V[0].score));
   return V;
-}
-
-inline sim_vector
-dbSpaceImpl::queryImg(const queryArg &query) {
-  if (is_grayscale(query.avgl))
-    return do_query(query, 1);
-  else
-    return do_query(query, 3);
 }
 
 void dbSpaceImpl::removeImage(imageId id) {
@@ -900,7 +796,7 @@ imageId_list dbSpaceAlter::getImgIdList() {
 dbSpace::dbSpace() {}
 dbSpace::~dbSpace() {}
 
-dbSpaceImpl::dbSpaceImpl() : m_nextIndex(0), m_bucketsValid(true) {
+dbSpaceImpl::dbSpaceImpl() : m_nextIndex(0) {
   if (!imgBinInited)
     initImgBin();
   if (imgbuckets.count() != sizeof(imgbuckets) / sizeof(imgbuckets[0][0][0]))

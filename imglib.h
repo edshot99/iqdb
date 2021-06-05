@@ -356,8 +356,6 @@ private:
   void getImgDataByID(imageId id, ImgData *img) { throw usage_error("Not supported in simple mode."); }
   void getImgAvgl(imageId id, lumin_native &avgl) { avgl = find(id).avgl(); }
 
-  sim_vector do_query(const queryArg q, int num_colors);
-
   sigMap m_images;
 
   size_t m_nextIndex;
@@ -374,7 +372,6 @@ private:
   };
   typedef bucket_set<bucket_type> buckets_t;
   buckets_t imgbuckets;
-  bool m_bucketsValid;
 };
 
 // Directly modify DB file on disk.
