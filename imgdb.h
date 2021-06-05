@@ -135,23 +135,11 @@ DEFINE_ERROR(image_error, simple_error) // Could not successfully extract image 
 DEFINE_ERROR(duplicate_id, param_error) // Image ID already in DB.
 DEFINE_ERROR(invalid_id, param_error)   // Image ID not found in DB.
 
-#ifdef INTMATH
-// fixme: make Score and DScore proper classes with conversion operators
-typedef int32_t Score;
-typedef int64_t DScore;
-
-const Score ScoreScale = 20;
-const Score ScoreMax = (1 << ScoreScale);
-
-template <typename T>
-inline Score MakeScore(T i) { return i << imgdb::ScoreScale; }
-#else
 typedef float Score;
 typedef float DScore;
 
 template <typename T>
 inline Score MakeScore(T i) { return i; }
-#endif
 
 typedef struct {
   Score v[3];
@@ -171,11 +159,7 @@ struct image_info {
 
   static void avglf2i(const double avglf[3], lumin_native &avgl) {
     for (int c = 0; c < 3; c++) {
-#ifdef INTMATH
-      avgl.v[c] = lrint(ScoreMax * avglf[c]);
-#else
       avgl.v[c] = avglf[c];
-#endif
     }
   };
 };

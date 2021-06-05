@@ -35,12 +35,6 @@ using nlohmann::json;
 using httplib::Server;
 using imgdb::dbSpace;
 
-#ifdef INTMATH
-#define ScD(x) ((double)(x) / imgdb::ScoreMax)
-#else
-#define ScD(x) (x)
-#endif
-
 static Server server;
 
 void install_signal_handlers() {
@@ -130,7 +124,7 @@ void http_server(const std::string host, const int port, const std::string datab
     for (const auto &match : matches) {
       data += {
           {"id", match.id},
-          {"score", ScD(match.score)},
+          {"score", match.score},
       };
     }
 

@@ -19,13 +19,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-# Set -DINTMATH. By default iqdb uses integer math for the similarity
-# computation, because it is often slightly faster than floating point math
-# (and iqdb cannot make use of SSE et.al.) You can remove this option if you
-# wish to compare both versions. This setting has negligible impact on the
-# value of the similarity result.
-add_compile_definitions(INTMATH)
-
 add_executable(iqdb debug.cpp haar.cpp imgdb.cpp iqdb.cpp resizer.cpp server.cpp vendor/httplib.cpp)
 #add_executable(test-iqdb test-iqdb.cpp debug.cpp haar.cpp imgdb.cpp iqdb.cpp resizer.cpp server.cpp vendor/httplib.cpp)
 

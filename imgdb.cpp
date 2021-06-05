@@ -33,21 +33,6 @@
 
 namespace imgdb {
 
-// Globals
-#ifdef INTMATH
-Score weights[2][6][3];
-
-#define ScD(x) ((double)(x) / imgdb::ScoreMax)
-#define DScD(x) ScD(((x) / imgdb::ScoreMax))
-#define DScSc(x) ((x) >> imgdb::ScoreScale)
-#else
-#define weights weightsf
-
-#define ScD(x) (x)
-#define DScD(x) (x)
-#define DScSc(x) (x)
-#endif
-
 /* Fixed weight mask for pixel positions (i,j).
 Each entry x = i*NUM_PIXELS + j, gets value max(i,j) saturated at 5.
 To be treated as a constant.
@@ -123,15 +108,6 @@ void initImgBin() {
   for (i = 0; i < 5; i++)
     for (j = 0; j < 5; j++)
       imgBin[i * NUM_PIXELS + j] = std::max(i, j);
-      // Note: imgBin[0] == 0
-
-      /* Integer weights. */
-#ifdef INTMATH
-  for (i = 0; i < 2; i++)
-    for (j = 0; j < 6; j++)
-      for (int c = 0; c < 3; c++)
-        weights[i][j][c] = lrint(weightsf[i][j][c] * ScoreMax);
-#endif
 }
 
 bool dbSpaceImpl::hasImage(imageId id) {
@@ -552,7 +528,7 @@ sim_vector dbSpaceImpl::queryFromSignature(const ImgData &signature, size_t numr
     Score s = 0;
 
     for (int c = 0; c < num_colors; c++) {
-      s += DScSc(((DScore)weights[0][0][c]) * std::abs(itr.avgl().v[c] - q.avgl.v[c]));
+      s += ((DScore)weights[0][c]) * std::abs(itr.avgl().v[c] - q.avgl.v[c]);
     }
 
     scores[itr.index()] = s;
@@ -566,7 +542,7 @@ sim_vector dbSpaceImpl::queryFromSignature(const ImgData &signature, size_t numr
       if (bucket.empty())
         continue;
 
-      Score weight = weights[0][imgBin[idx]][c];
+      Score weight = weights[imgBin[idx]][c];
       scale -= weight;
 
       // update the score of every image which has this coef
@@ -612,7 +588,7 @@ sim_vector dbSpaceImpl::queryFromSignature(const ImgData &signature, size_t numr
     const sim_result &curResTmp = pqResults.top();
 
     imageIterator itr(curResTmp, *this);
-    V.push_back(sim_value(itr.id(), DScSc(((DScore)curResTmp.score) * 100 * scale)));
+    V.push_back(sim_value(itr.id(), ((DScore)curResTmp.score) * 100 * scale));
     pqResults.pop();
   }
 
@@ -686,7 +662,7 @@ Score dbSpaceCommon::calcSim(imageId id1, imageId id2, bool ignore_color) {
   int cnum = ignore_color || is_grayscale(avgl1) || is_grayscale(avgl2) ? 1 : 3;
 
   for (int c = 0; c < cnum; c++)
-    score += DScSc(2 * ((DScore)weights[0][0][c]) * std::abs(avgl1.v[c] - avgl2.v[c]));
+    score += DScSc(2 * ((DScore)weights[0][c]) * std::abs(avgl1.v[c] - avgl2.v[c]));
 
   for (int c = 0; c < cnum; c++) {
     std::sort(sig1[c] + 0, sig1[c] + NUM_COEFS);
@@ -696,7 +672,7 @@ Score dbSpaceCommon::calcSim(imageId id1, imageId id2, bool ignore_color) {
       int ind1 = b1 == NUM_COEFS ? std::numeric_limits<int>::max() : sig1[c][b1];
       int ind2 = b2 == NUM_COEFS ? std::numeric_limits<int>::max() : sig2[c][b2];
 
-      Score weight = weights[0][imgBin[std::abs(ind1 < ind2 ? ind1 : ind2)]][c];
+      Score weight = weights[imgBin[std::abs(ind1 < ind2 ? ind1 : ind2)]][c];
       scale -= weight;
 
       if (ind1 == ind2)
