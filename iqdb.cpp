@@ -21,14 +21,10 @@
 #include <cstring>
 #include <cstdlib>
 #include <string>
-#include <csignal>
 
-#define DEBUG_IQDB
 #include "debug.h"
 #include "imgdb.h"
 #include "server.h"
-
-int debug_level = DEBUG_errors | DEBUG_base | DEBUG_summary | DEBUG_connections | DEBUG_images | DEBUG_imgdb; // | DEBUG_dupe_finder; // | DEBUG_resizer;
 
 int main(int argc, char **argv) {
   try {
@@ -38,7 +34,7 @@ int main(int argc, char **argv) {
 
     if (!strncmp(argv[1], "-d=", 3)) {
       debug_level = strtol(argv[1] + 3, NULL, 0);
-      DEBUG(base)("Debug level set to %x\n", debug_level);
+      INFO("Debug level set to %x\n", debug_level);
       argv++;
       argc--;
     }
@@ -55,11 +51,11 @@ int main(int argc, char **argv) {
 
     // Handle this specially because it means we need to fix the DB before restarting :(
   } catch (const imgdb::data_error &err) {
-    DEBUG(errors)("Data error: %s.\n", err.what());
+    DEBUG("Data error: %s.\n", err.what());
     exit(10);
 
   } catch (const imgdb::base_error &err) {
-    DEBUG(errors)("Caught error %s: %s.\n", err.type(), err.what());
+    DEBUG("Caught error %s: %s.\n", err.type(), err.what());
     if (errno)
       perror("Last system error");
   }

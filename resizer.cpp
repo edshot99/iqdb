@@ -26,16 +26,10 @@
 #include "imgdb.h"
 #include "resizer.h"
 
-extern int debug_level;
-
 image_types get_image_info(const unsigned char *data, size_t length) {
-  DEBUG(image_info)("Determining image info for %zd bytes at %p... ", length, data);
-
   if (length >= 2 && data[0] == 0xff && data[1] == 0xd8) {
-    DEBUG_CONT(image_info)(DEBUG_OUT, "looks like JPEG... ");
     return IMG_JPEG;
   } else {
-    DEBUG_CONT(image_info)(DEBUG_OUT, "too short to tell.\n");
     return IMG_UNKNOWN;
   }
 }
@@ -58,7 +52,7 @@ Image resize_image_data(const unsigned char *data, size_t len, unsigned int thu_
     return img;
 
   gdImageCopyResampled(thu.get(), img.get(), 0, 0, 0, 0, thu_x, thu_y, img->sx, img->sy);
-  DEBUG(terse)("Resized %d x %d to %d x %d.\n", img->sx, img->sy, thu_x, thu_y);
+  DEBUG("Resized %d x %d to %d x %d.\n", img->sx, img->sy, thu_x, thu_y);
 
   return thu;
 }

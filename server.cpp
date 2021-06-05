@@ -18,13 +18,13 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 \**************************************************************************/
 
+#include <csignal>
 #include <cstddef>
 #include <string>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
 
-#define DEBUG_IQDB
 #include "debug.h"
 #include "imgdb.h"
 
@@ -34,8 +34,6 @@
 using nlohmann::json;
 using httplib::Server;
 using imgdb::dbSpace;
-
-extern int debug_level;
 
 #ifdef INTMATH
 #define ScD(x) ((double)(x) / imgdb::ScoreMax)
@@ -61,7 +59,7 @@ void install_signal_handlers() {
 }
 
 void http_server(const std::string host, const int port, const std::string database_filename) {
-  DEBUG(summary)("Starting server...\n");
+  INFO("Starting server...\n");
 
   std::shared_mutex mutex_;
   auto memory_db = dbSpace::load_file(database_filename.c_str(), dbSpace::mode_simple);
@@ -153,7 +151,7 @@ void http_server(const std::string host, const int port, const std::string datab
   });
 
   server.set_logger([](const auto &req, const auto &res) {
-    DEBUG(summary)("%s \"%s %s %s\" %d %zd\n", req.remote_addr.c_str(), req.method.c_str(), req.path.c_str(), req.version.c_str(), res.status, res.body.size());
+    INFO("%s \"%s %s %s\" %d %zd\n", req.remote_addr.c_str(), req.method.c_str(), req.path.c_str(), req.version.c_str(), res.status, res.body.size());
   });
 
   server.set_exception_handler([](const auto& req, auto& res, std::exception &e) {
@@ -163,9 +161,9 @@ void http_server(const std::string host, const int port, const std::string datab
     res.status = 500;
   });
 
-  DEBUG(summary)("Listening on %s:%i.\n", host.c_str(), port);
+  INFO("Listening on %s:%i.\n", host.c_str(), port);
   server.listen(host.c_str(), port);
-  DEBUG(summary)("Stopping server...\n");
+  INFO("Stopping server...\n");
 }
 
 void help() {

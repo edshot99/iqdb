@@ -21,6 +21,7 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 \**************************************************************************/
 
+#include <unistd.h>
 #include <sys/mman.h>
 
 #include <algorithm>
@@ -30,8 +31,6 @@
 #include "debug.h"
 #include "imgdb.h"
 #include "imglib.h"
-
-extern int debug_level;
 
 namespace imgdb {
 
@@ -66,7 +65,7 @@ inline void mapped_file::unmap() {
   if (!m_base)
     return;
   if (munmap(m_base, m_length))
-    DEBUG(errors)("WARNING: Could not unmap %zd bytes of memory.\n", m_length);
+    ERROR("Could not unmap %zd bytes of memory.\n", m_length);
 }
 
 void imageIdIndex_list::set_base() {
@@ -308,11 +307,11 @@ void dbSpace::imgDataFromBlob(const void *data, size_t data_size, imageId id, Im
 }
 
 void dbSpaceImpl::load(const char *filename) {
-  DEBUG(imgdb)("Loading db (simple) from %s... ", filename);
+  INFO("Loading db (simple) from %s...\n", filename);
   db_ifstream f(filename);
 
   if (!f.is_open()) {
-    DEBUG(summary)("Unable to open file %s for read ops: %s.\n", filename, strerror(errno));
+    WARN("Unable to open file %s for read ops: %s.\n", filename, strerror(errno));
     return;
   }
 
@@ -328,17 +327,7 @@ void dbSpaceImpl::load(const char *filename) {
 
   count_t numImg = f.read<count_t>();
   offset_t firstOff = f.read<offset_t>();
-  DEBUG_CONT(imgdb)(DEBUG_OUT, "has %" FMT_count_t " images at %llx. ", numImg, (long long)firstOff);
-
-  // read bucket sizes and reserve space so that buckets do not
-  // waste memory due to exponential growth of std::vector
-  for (typename buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr)
-    itr->reserve(f.read<count_t>());
-  DEBUG_CONT(imgdb)(DEBUG_OUT, "bucket sizes done at %llx... ", (long long)firstOff);
-
-  // read IDs (for verification only).
-  std::vector<imageId> ids(numImg);
-  f.read(ids.data(), numImg);
+  INFO("%s has %" FMT_count_t " images at %llx.\n", filename, numImg, (long long)firstOff);
 
   // read sigs
   f.seekg(firstOff);
@@ -350,10 +339,6 @@ void dbSpaceImpl::load(const char *filename) {
     size_t ind = m_nextIndex++;
     imgbuckets.add(sig, ind);
 
-    if (ids.at(ind) != sig.id) {
-      DEBUG(warnings)("WARNING: index %zd DB header ID %08llx mismatch with sig ID %08llx.\n", ind, (long long)ids[ind], (long long)sig.id);
-    }
-
     m_info[ind].id = sig.id;
     SigStruct::avglf2i(sig.avglf, m_info[ind].avgl);
 
@@ -362,12 +347,12 @@ void dbSpaceImpl::load(const char *filename) {
 
   for (typename buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr)
     itr->set_base();
-  DEBUG_CONT(imgdb)(DEBUG_OUT, "complete!\n");
+  INFO("Loaded %ld images from %s!\n", getImgCount(), filename);
   f.close();
 }
 
 void dbSpaceAlter::load(const char *filename) {
-  DEBUG(imgdb)("Loading db (alter) from %s... ", filename);
+  INFO("Loading db (alter) from %s... \n", filename);
   delete m_f;
   m_f = new db_fstream(filename);
   m_fname = filename;
@@ -387,7 +372,7 @@ void dbSpaceAlter::load(const char *filename) {
     uint version = v_code & 0xff;
 
     if ((v_code >> 8) == 0) {
-      DEBUG(warnings)("Old database version.\n");
+      WARN("Old database version.\n");
     } else if ((v_code >> 8) != SRZ_V_SZ) {
       throw data_error("Database incompatible with this system");
     }
@@ -395,12 +380,12 @@ void dbSpaceAlter::load(const char *filename) {
     if (version != SRZ_V0_9_0)
       throw data_error("Only current version is supported in alter mode, upgrade first using normal mode.");
 
-    DEBUG(imgdb)("Loading db header (cur ver)... ");
+    INFO("Loading db header (cur ver)...\n");
     m_hdrOff = m_f->tellg();
     count_t numImg = m_f->read<count_t>();
     m_sigOff = m_f->read<offset_t>();
 
-    DEBUG_CONT(imgdb)(DEBUG_OUT, "has %" FMT_count_t " images. ", numImg);
+    INFO("%s has %" FMT_count_t " images.\n", filename, numImg);
     // read bucket sizes
     for (buckets_t::iterator itr = m_buckets.begin(); itr != m_buckets.end(); ++itr)
       itr->size = m_f->read<count_t>();
@@ -411,7 +396,7 @@ void dbSpaceAlter::load(const char *filename) {
       m_images[m_f->read<count_t>()] = k;
 
     m_rewriteIDs = false;
-    DEBUG_CONT(imgdb)(DEBUG_OUT, "complete!\n");
+    INFO("Loaded %ld images from %s!\n", getImgCount(), filename);
   } catch (const base_error &e) {
     if (m_f) {
       if (m_f->is_open())
@@ -419,7 +404,7 @@ void dbSpaceAlter::load(const char *filename) {
       delete m_f;
       m_fname.clear();
     }
-    DEBUG_CONT(imgdb)(DEBUG_OUT, "failed!\n");
+    ERROR("failed!\n");
     throw;
   }
 }
@@ -452,7 +437,7 @@ void dbSpaceImpl::save_file(const char* filename) {
     then follow image signatures, see struct ImgData
   */
 
-  DEBUG(imgdb)("Saving dummy db... ");
+  INFO("Saving dummy db... ");
 
   db_ofstream file(filename);
 
@@ -470,7 +455,7 @@ void dbSpaceImpl::save_file(const char* filename) {
   for (buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr)
     file.write<count_t>(0);
 
-  DEBUG_CONT(imgdb)(DEBUG_OUT, "done!\n");
+  INFO("done!\n");
 }
 
 // Relocate sigs from the end into the holes left by deleted images.
@@ -510,12 +495,12 @@ void dbSpaceAlter::save_file(const char *filename) {
   if (!m_f)
     throw data_error("Couldn't save database; m_f is invalid");
 
-  DEBUG(imgdb)("saving file, %zd deleted images... ", m_deleted.size());
+  INFO("saving file, %zd deleted images...\n", m_deleted.size());
   if (!m_deleted.empty())
     move_deleted();
 
   if (m_rewriteIDs) {
-    DEBUG_CONT(imgdb)(DEBUG_OUT, "Rewriting all IDs... ");
+    INFO("Rewriting all IDs... ");
     imageId_list ids(m_images.size(), ~imageId());
     for (sigMap::iterator itr = m_images.begin(); itr != m_images.end(); ++itr) {
       if (itr->second >= m_images.size())
@@ -533,7 +518,7 @@ void dbSpaceAlter::save_file(const char *filename) {
     m_rewriteIDs = false;
   }
 
-  DEBUG_CONT(imgdb)(DEBUG_OUT, "saving header... ");
+  INFO("saving header...\n");
   m_f->seekp(0);
   m_f->write<uint32_t>(SRZ_V_CODE);
   m_f->seekp(m_hdrOff);
@@ -541,7 +526,7 @@ void dbSpaceAlter::save_file(const char *filename) {
   m_f->write(m_sigOff);
   m_f->write(m_buckets);
 
-  DEBUG_CONT(imgdb)(DEBUG_OUT, "done!\n");
+  INFO("done!\n");
   m_f->flush();
 }
 
@@ -551,7 +536,7 @@ void dbSpaceAlter::save_file(const char *filename) {
 void dbSpaceAlter::resize_header() {
   // make space for 1024 new IDs
   const size_t numrel = (1024 * sizeof(imageId) + sizeof(ImgData) - 1) / sizeof(ImgData);
-  DEBUG(imgdb)("relocating %zd/%zd images... from %llx ", numrel, m_images.size(), (long long int)m_sigOff);
+  INFO("relocating %zd/%zd images... from %llx ", numrel, m_images.size(), (long long int)m_sigOff);
   if (m_images.size() < numrel)
     throw internal_error("dbSpaceAlter::resize_header called with too few images!");
   ImgData sigs[numrel];
@@ -559,14 +544,14 @@ void dbSpaceAlter::resize_header() {
   m_f->read(sigs, numrel);
   off_t writeOff = m_sigOff + m_images.size() * sizeof(ImgData);
   m_sigOff = m_f->tellg();
-  DEBUG_CONT(imgdb)(DEBUG_OUT, "to %llx (new off %llx) ", (long long int)writeOff, (long long int)m_sigOff);
+  INFO("to %llx (new off %llx) ", (long long int)writeOff, (long long int)m_sigOff);
   m_f->seekp(writeOff);
   m_f->write(sigs, numrel);
 
   size_t addrel = m_images.size() - numrel;
   for (sigMap::iterator itr = m_images.begin(); itr != m_images.end(); ++itr)
     itr->second = (itr->second >= numrel ? itr->second - numrel : itr->second + addrel);
-  DEBUG_CONT(imgdb)(DEBUG_OUT, "done.\n");
+  INFO("done.\n");
 
   m_rewriteIDs = true;
 }
