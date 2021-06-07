@@ -52,7 +52,7 @@
 #include <string.h>
 
 /* imgSeek Includes */
-#include "haar.h"
+#include <iqdb/haar.h>
 
 // RGB -> YIQ colorspace conversion; Y luminance, I,Q chrominance.
 // If RGB in [0..255] then Y in [0..255] and I,Q in [-127..127].

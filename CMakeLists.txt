@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.14)
-include(FetchContent)
 
 project(iqdb)
 
@@ -23,10 +22,12 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 # https://github.com/yhirose/cpp-httplib/blob/master/CMakeLists.txt
 set(HTTPLIB_COMPILE ON)
 
-# Compile library instead of using header-only version.
+# Compile json library instead of using header-only version.
 # https://github.com/nlohmann/json/blob/develop/CMakeLists.txt#L35
 # https://github.com/nlohmann/json#integration
 set(JSON_MultipleHeaders ON)
+
+include(FetchContent)
 
 FetchContent_Declare(
   httplib
@@ -55,9 +56,4 @@ find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GDLIB REQUIRED gdlib)
 
-add_executable(iqdb debug.cpp haar.cpp imgdb.cpp iqdb.cpp resizer.cpp server.cpp haar_signature.cpp)
-#add_executable(test-iqdb test-iqdb.cpp debug.cpp haar.cpp imgdb.cpp iqdb.cpp resizer.cpp server.cpp vendor/httplib.cpp)
-
-target_link_libraries(iqdb PRIVATE Threads::Threads nlohmann_json::nlohmann_json httplib::httplib ${GDLIB_LIBRARIES})
-target_include_directories(iqdb PRIVATE ${HTTPLIB_INCLUDE_DIR} ${GDLIB_INCLUDE_DIRS})
-target_compile_options(iqdb PUBLIC ${GDLIB_CFLAGS_OTHER})
+add_subdirectory(src)

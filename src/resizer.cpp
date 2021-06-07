@@ -22,9 +22,9 @@
 #include <gd.h>
 #include <memory>
 
-#include "debug.h"
-#include "imgdb.h"
-#include "resizer.h"
+#include <iqdb/debug.h>
+#include <iqdb/imgdb.h>
+#include <iqdb/resizer.h>
 
 image_types get_image_info(const unsigned char *data, size_t length) {
   if (length >= 2 && data[0] == 0xff && data[1] == 0xd8) {

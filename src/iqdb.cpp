@@ -22,13 +22,13 @@
 #include <cstdlib>
 #include <string>
 
-#include "debug.h"
-#include "imgdb.h"
-#include "server.h"
+#include <iqdb/debug.h>
+#include <iqdb/imgdb.h>
+#include <iqdb/server.h>
 
 int main(int argc, char **argv) {
   try {
-    //	open_swap();
+    // open_swap();
     if (argc < 2)
       help();
 

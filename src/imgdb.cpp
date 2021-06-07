@@ -26,9 +26,9 @@
 #include <memory>
 #include <vector>
 
-#include "debug.h"
-#include "imgdb.h"
-#include "imglib.h"
+#include <iqdb/debug.h>
+#include <iqdb/imgdb.h>
+#include <iqdb/imglib.h>
 
 namespace imgdb {
 

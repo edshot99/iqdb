@@ -25,8 +25,8 @@
 #include <mutex>
 #include <shared_mutex>
 
-#include "debug.h"
-#include "imgdb.h"
+#include <iqdb/debug.h>
+#include <iqdb/imgdb.h>
 
 #include <httplib.h>
 #include <nlohmann/json.hpp>
