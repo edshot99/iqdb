@@ -12,8 +12,8 @@
 #include "vendor/catch.hpp"
 
 #include "server.h"
-#include "vendor/httplib.h"
-#include "vendor/json.hpp"
+#include <httplib.h>
+#include <nlohmann/json.hpp>
 #include <cstdio>
 
 using httplib::Client;

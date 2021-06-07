@@ -28,8 +28,8 @@
 #include "debug.h"
 #include "imgdb.h"
 
-#include "vendor/httplib.h"
-#include "vendor/json.hpp"
+#include <httplib.h>
+#include <nlohmann/json.hpp>
 
 using nlohmann::json;
 using httplib::Server;
