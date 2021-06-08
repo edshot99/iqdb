@@ -2,9 +2,13 @@
 #define SERVER_H
 
 #include <string>
-#include "imgdb.h"
+#include <iqdb/imgdb.h>
+
+namespace imgdb {
 
 void help();
 void http_server(const std::string host, const int port, const std::string database_filename);
+
+}
 
 #endif

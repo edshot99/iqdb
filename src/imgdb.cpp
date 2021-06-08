@@ -29,6 +29,7 @@
 #include <iqdb/debug.h>
 #include <iqdb/imgdb.h>
 #include <iqdb/imglib.h>
+#include <iqdb/haar_signature.h>
 
 namespace imgdb {
 
@@ -65,63 +66,14 @@ inline ImgData dbSpaceAlter::get_sig(size_t ind) {
   return sig;
 }
 
-inline bool dbSpaceCommon::is_grayscale(const lumin_native &avgl) {
-  return std::abs(avgl.v[1]) + std::abs(avgl.v[2]) < MakeScore(6) / 1000;
-}
-
-ImgData::ImgData(const std::string blob, imageId imgId) {
-  std::vector<unsigned char> rchan(NUM_PIXELS * NUM_PIXELS);
-  std::vector<unsigned char> gchan(NUM_PIXELS * NUM_PIXELS);
-  std::vector<unsigned char> bchan(NUM_PIXELS * NUM_PIXELS);
-
-  id = imgId;
-  width = 0;
-  height = 0;
-
-  Image image = resize_image_data((const unsigned char *)blob.data(), blob.size(), NUM_PIXELS, NUM_PIXELS);
-
-  for (int y = 0; y < NUM_PIXELS; y++) {
-    for (int x = 0; x < NUM_PIXELS; x++) {
-      // https://libgd.github.io/manuals/2.3.1/files/gd-c.html#gdImageGetPixel
-      // https://libgd.github.io/manuals/2.3.1/files/gd-h.html#gdTrueColorGetRed
-      int pixel = gdImageGetPixel(image.get(), x, y);
-      rchan[x + y * NUM_PIXELS] = gdTrueColorGetRed(pixel);
-      gchan[x + y * NUM_PIXELS] = gdTrueColorGetGreen(pixel);
-      bchan[x + y * NUM_PIXELS] = gdTrueColorGetBlue(pixel);
-    }
-  }
-
-  std::vector<Unit> cdata1(NUM_PIXELS * NUM_PIXELS);
-  std::vector<Unit> cdata2(NUM_PIXELS * NUM_PIXELS);
-  std::vector<Unit> cdata3(NUM_PIXELS * NUM_PIXELS);
-  transformChar(rchan.data(), gchan.data(), bchan.data(), cdata1.data(), cdata2.data(), cdata3.data());
-  calcHaar(cdata1.data(), cdata2.data(), cdata3.data(), sig1, sig2, sig3, avglf);
-}
-
 template <typename B>
-inline void dbSpaceCommon::bucket_set<B>::add(const ImgData &nsig, count_t index) {
-  lumin_native avgl;
-  image_info::avglf2i(nsig.avglf, avgl);
-  for (int i = 0; i < NUM_COEFS; i++) { // populate buckets
-
-    //imageId_array3 (imgbuckets = dbSpace[dbId]->(imgbuckets;
-    if (nsig.sig1[i] > 0)
-      buckets[0][0][nsig.sig1[i]].add(nsig.id, index);
-    if (nsig.sig1[i] < 0)
-      buckets[0][1][-nsig.sig1[i]].add(nsig.id, index);
-
-    if (is_grayscale(avgl))
-      continue; // ignore I/Q coeff's if chrominance too low
-
-    if (nsig.sig2[i] > 0)
-      buckets[1][0][nsig.sig2[i]].add(nsig.id, index);
-    if (nsig.sig2[i] < 0)
-      buckets[1][1][-nsig.sig2[i]].add(nsig.id, index);
-
-    if (nsig.sig3[i] > 0)
-      buckets[2][0][nsig.sig3[i]].add(nsig.id, index);
-    if (nsig.sig3[i] < 0)
-      buckets[2][1][-nsig.sig3[i]].add(nsig.id, index);
+inline void dbSpaceCommon::bucket_set<B>::add(const HaarSignature &nsig, count_t index) {
+  for (int c = 0; c < nsig.num_colors(); c++) {
+    for (int i = 0; i < NUM_COEFS; i++) {
+      int coef = nsig.sig[c][i];
+      int s = coef < 0;
+      buckets[c][s][abs(coef)].add(index);
+    }
   }
 }
 
@@ -143,8 +95,8 @@ inline B &dbSpaceCommon::bucket_set<B>::at(int col, int coeff, int *idxret) {
   return buckets[col][pn][idx];
 }
 
-void dbSpaceImpl::addImageData(const ImgData *img) {
-  if (hasImage(img->id)) // image already in db
+void dbSpaceImpl::addImageData(imageId post_id, const HaarSignature& signature) {
+  if (hasImage(post_id)) // image already in db
     throw duplicate_id("Image already in database.");
 
   size_t ind = m_nextIndex++;
@@ -155,16 +107,25 @@ void dbSpaceImpl::addImageData(const ImgData *img) {
       m_info.reserve(10 + ind + ind / 40);
     m_info.resize(ind + 1);
   }
-  m_info.at(ind).id = img->id;
-  image_info::avglf2i(img->avglf, m_info[ind].avgl);
-  m_images.add_index(img->id, ind);
+  m_info.at(ind).id = post_id;
+  image_info::avglf2i(signature.avglf, m_info[ind].avgl);
+  m_images.add_index(post_id, ind);
 
-  imgbuckets.add(*img, ind);
+  imgbuckets.add(signature, ind);
 }
 
-void dbSpaceAlter::addImageData(const ImgData *img) {
-  if (hasImage(img->id)) // image already in db
+void dbSpaceAlter::addImageData(imageId post_id, const HaarSignature& signature) {
+  if (hasImage(post_id)) // image already in db
     throw duplicate_id("Image already in database.");
+
+  ImgData img;
+  img.id = post_id;
+  img.width = 0;
+  img.height = 0;
+  std::copy(std::begin(signature.avglf), std::end(signature.avglf), img.avglf);
+  std::copy(std::begin(signature.sig[0]), std::end(signature.sig[0]), img.sig1);
+  std::copy(std::begin(signature.sig[1]), std::end(signature.sig[1]), img.sig2);
+  std::copy(std::begin(signature.sig[2]), std::end(signature.sig[2]), img.sig3);
 
   size_t ind;
   if (!m_deleted.empty()) {
@@ -181,13 +142,13 @@ void dbSpaceAlter::addImageData(const ImgData *img) {
 
   if (!m_rewriteIDs) {
     m_f->seekp(m_imgOff + ind * sizeof(imageId));
-    m_f->write(img->id);
+    m_f->write(post_id);
   }
   m_f->seekp(m_sigOff + ind * sizeof(ImgData));
-  m_f->write(*img);
+  m_f->write(img);
 
-  m_buckets.add(*img, ind);
-  m_images[img->id] = ind;
+  m_buckets.add(signature, ind);
+  m_images[post_id] = ind;
 }
 
 void dbSpaceImpl::load(const char *filename) {
@@ -220,8 +181,10 @@ void dbSpaceImpl::load(const char *filename) {
     ImgData sig;
     f.read(&sig);
 
+    HaarSignature haar(sig);
+
     size_t ind = m_nextIndex++;
-    imgbuckets.add(sig, ind);
+    imgbuckets.add(haar, ind);
 
     m_info[ind].id = sig.id;
     image_info::avglf2i(sig.avglf, m_info[ind].avgl);
@@ -448,34 +411,32 @@ inline bool dbSpaceImpl::skip_image(const imageIterator &itr) {
 }
 
 sim_vector dbSpace::queryFromBlob(const std::string blob, int numres) {
-  ImgData signature(blob, 0);
+  HaarSignature signature = HaarSignature::from_file_content(blob);
   return queryFromSignature(signature, numres);
 }
 
-sim_vector dbSpaceImpl::queryFromSignature(const ImgData &signature, size_t numres) {
+sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_t numres) {
   Score scale = 0;
   size_t count = m_nextIndex;
   std::vector<Score> scores(count, 0);
   std::priority_queue<sim_result> pqResults; /* results priority queue; largest at top */
   sim_vector V; /* output results */
-  queryArg q(signature);
-  int num_colors = is_grayscale(q.avgl) ? 1 : 3;
 
   // Luminance score (DC coefficient).
   for (imageIterator itr = image_begin(); itr != image_end(); ++itr) {
     Score s = 0;
 
-    for (int c = 0; c < num_colors; c++) {
-      s += ((DScore)weights[0][c]) * std::abs(itr.avgl().v[c] - q.avgl.v[c]);
+    for (int c = 0; c < signature.num_colors(); c++) {
+      s += ((DScore)weights[0][c]) * std::abs(itr.avgl().v[c] - signature.avglf[c]);
     }
 
     scores[itr.index()] = s;
   }
 
   for (int b = 0; b < NUM_COEFS; b++) { // for every coef on a sig
-    for (int c = 0; c < num_colors; c++) {
+    for (int c = 0; c < signature.num_colors(); c++) {
       int idx;
-      bucket_type &bucket = imgbuckets.at(c, q.sig[c][b], &idx);
+      bucket_type &bucket = imgbuckets.at(c, signature.sig[c][b], &idx);
 
       if (bucket.empty())
         continue;
@@ -514,7 +475,7 @@ sim_vector dbSpaceImpl::queryFromSignature(const ImgData &signature, size_t numr
   }
 
   if (scale != 0)
-    scale = ((DScore)MakeScore(1)) * MakeScore(1) / scale;
+    scale = ((DScore)1) * 1.0 / scale;
 
   while (!pqResults.empty()) {
     const sim_result &curResTmp = pqResults.top();
@@ -542,27 +503,13 @@ void dbSpaceAlter::removeImage(imageId id) {
 }
 
 template <typename B>
-inline void dbSpaceCommon::bucket_set<B>::remove(const ImgData &nsig) {
-  lumin_native avgl;
-  image_info::avglf2i(nsig.avglf, avgl);
-  for (int i = 0; 0 && i < NUM_COEFS; i++) {
-    if (nsig.sig1[i] > 0)
-      buckets[0][0][nsig.sig1[i]].remove(nsig.id);
-    if (nsig.sig1[i] < 0)
-      buckets[0][1][-nsig.sig1[i]].remove(nsig.id);
-
-    if (is_grayscale(avgl))
-      continue; // ignore I/Q coeff's if chrominance too low
-
-    if (nsig.sig2[i] > 0)
-      buckets[1][0][nsig.sig2[i]].remove(nsig.id);
-    if (nsig.sig2[i] < 0)
-      buckets[1][1][-nsig.sig2[i]].remove(nsig.id);
-
-    if (nsig.sig3[i] > 0)
-      buckets[2][0][nsig.sig3[i]].remove(nsig.id);
-    if (nsig.sig3[i] < 0)
-      buckets[2][1][-nsig.sig3[i]].remove(nsig.id);
+inline void dbSpaceCommon::bucket_set<B>::remove(const HaarSignature &nsig, imageId post_id) {
+  for (int c = 0; c < nsig.num_colors(); c++) {
+    for (int i = 0; i < NUM_COEFS; i++) {
+      int coef = nsig.sig[c][i];
+      int s = coef < 0;
+      buckets[c][s][abs(coef)].remove(post_id);
+    }
   }
 }
 

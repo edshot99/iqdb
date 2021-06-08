@@ -26,6 +26,8 @@
 #include <iqdb/imgdb.h>
 #include <iqdb/server.h>
 
+using namespace imgdb;
+
 int main(int argc, char **argv) {
   try {
     // open_swap();

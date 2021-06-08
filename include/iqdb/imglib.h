@@ -51,9 +51,9 @@ different but the majority of the actual code is the same for both types.
 #include <fstream>
 #include <iostream>
 
-#include "haar.h"
-#include "imgdb.h"
-#include "resizer.h"
+#include <iqdb/haar.h>
+#include <iqdb/imgdb.h>
+#include <iqdb/resizer.h>
 
 namespace imgdb {
 
@@ -170,8 +170,6 @@ public:
 // Common function used by all implementations.
 class dbSpaceCommon : public dbSpace {
 public:
-  static bool is_grayscale(const lumin_native &avgl);
-
   static const int mode_mask_simple = 0x02;
   static const int mode_mask_alter = 0x04;
 
@@ -196,8 +194,8 @@ protected:
     colbucket &operator[](size_t ind) { return buckets[ind]; }
     B &at(int col, int coef, int *idxret = NULL);
 
-    void add(const ImgData &img, count_t index);
-    void remove(const ImgData &img);
+    void add(const HaarSignature &sig, count_t index);
+    void remove(const HaarSignature &sig, imageId post_id);
 
     iterator begin() { return buckets[0][0]; }
     iterator end() { return buckets[count_0][0]; }
@@ -222,14 +220,14 @@ public:
   virtual void save_file(const char *filename) override;
 
   // Image queries.
-  virtual sim_vector queryFromSignature(const ImgData& img, size_t numres = 10) override;
+  virtual sim_vector queryFromSignature(const HaarSignature& sig, size_t numres = 10) override;
 
   // Stats.
   virtual size_t getImgCount() override;
   virtual bool hasImage(imageId id) override;
 
   // DB maintenance.
-  virtual void addImageData(const ImgData *img) override;
+  virtual void addImageData(imageId id, const HaarSignature& signature) override;
   virtual void removeImage(imageId id) override;
 
 private:
@@ -256,7 +254,7 @@ private:
 
   // XXX We use a uint32_t here to reduce memory consumption.
   struct bucket_type : public std::vector<uint32_t> {
-    void add(imageId id, count_t index) { push_back(index); }
+    void add(count_t index) { push_back(index); }
     void remove(imageId id) { throw usage_error("remove not implemented"); }
   };
 
@@ -273,14 +271,14 @@ public:
   virtual void save_file(const char *filename);
 
   // Image queries not supported.
-  virtual sim_vector queryFromSignature(const ImgData& img, size_t numres = 10) { throw usage_error("Not supported in alter mode."); }
+  virtual sim_vector queryFromSignature(const HaarSignature& img, size_t numres = 10) { throw usage_error("Not supported in alter mode."); }
 
   // Stats. Partially unsupported.
   virtual size_t getImgCount();
   virtual bool hasImage(imageId id);
 
   // DB maintenance.
-  virtual void addImageData(const ImgData *img);
+  virtual void addImageData(imageId id, const HaarSignature& signature);
 
   virtual void removeImage(imageId id);
 
@@ -297,7 +295,7 @@ private:
   void move_deleted();
 
   struct bucket_type {
-    void add(imageId id, count_t index) { size++; }
+    void add(count_t index) { size++; }
     void remove(imageId id) { size--; }
 
     count_t size;

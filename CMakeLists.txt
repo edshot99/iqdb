@@ -47,9 +47,16 @@ FetchContent_Declare(
   GIT_TAG        v2.13.6
 )
 
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt
+  GIT_TAG        7.1.3
+)
+
 FetchContent_MakeAvailable(httplib)
 FetchContent_MakeAvailable(json)
 FetchContent_MakeAvailable(Catch2)
+FetchContent_MakeAvailable(fmt)
 #FetchContent_MakeAvailable(sqliteOrm)
 
 find_package(Threads REQUIRED)

@@ -38,8 +38,9 @@
 #include <vector>
 
 // Haar transform defines
-#include "haar.h"
-#include "resizer.h"
+#include <iqdb/haar.h>
+#include <iqdb/haar_signature.h>
+#include <iqdb/resizer.h>
 
 namespace imgdb {
 
@@ -138,9 +139,6 @@ DEFINE_ERROR(invalid_id, param_error)   // Image ID not found in DB.
 typedef float Score;
 typedef float DScore;
 
-template <typename T>
-inline Score MakeScore(T i) { return i; }
-
 typedef struct {
   Score v[3];
 } lumin_native;
@@ -184,14 +182,6 @@ class dbSpace;
 class db_ifstream;
 class db_ofstream;
 
-// Standard query arguments.
-struct queryArg {
-  queryArg(const ImgData &img);
-
-  sig_t sig[3];
-  lumin_native avgl;
-};
-
 class dbSpace {
 public:
   static const int mode_simple = 0x02;   // Fast queries, less memory, cannot save, no image ID queries.
@@ -203,7 +193,7 @@ public:
   virtual ~dbSpace();
 
   // Image queries.
-  virtual sim_vector queryFromSignature(const ImgData& img, size_t numres = 10) = 0;
+  virtual sim_vector queryFromSignature(const HaarSignature& img, size_t numres = 10) = 0;
   virtual sim_vector queryFromBlob(const std::string blob, int numres = 10);
 
   // Stats.
@@ -211,8 +201,7 @@ public:
   virtual bool hasImage(imageId id) = 0;
 
   // DB maintenance.
-  virtual void addImageData(const ImgData *img) = 0;
-
+  virtual void addImageData(imageId id, const HaarSignature& signature) = 0;
   virtual void removeImage(imageId id) = 0;
 
 protected:
@@ -223,11 +212,6 @@ protected:
 private:
   void operator=(const dbSpace &);
 };
-
-inline queryArg::queryArg(const ImgData &img) {
-  memcpy(sig, img.sig1, sizeof(sig));
-  image_info::avglf2i(img.avglf, avgl);
-}
 
 } // namespace imgdb
 

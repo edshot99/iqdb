@@ -27,6 +27,7 @@
 
 #include <iqdb/debug.h>
 #include <iqdb/imgdb.h>
+#include <iqdb/haar_signature.h>
 
 #include <httplib.h>
 #include <nlohmann/json.hpp>
@@ -34,6 +35,8 @@
 using nlohmann::json;
 using httplib::Server;
 using imgdb::dbSpace;
+
+namespace imgdb {
 
 static Server server;
 
@@ -72,14 +75,18 @@ void http_server(const std::string host, const int port, const std::string datab
       throw imgdb::duplicate_id("Image already in database.");
 
     const auto &file = request.get_file_value("file");
-
-    imgdb::ImgData signature(file.content, post_id);
-    memory_db->addImageData(&signature);
-    file_db->addImageData(&signature);
+    const auto signature = HaarSignature::from_file_content(file.content);
+    memory_db->addImageData(post_id, signature);
+    file_db->addImageData(post_id, signature);
     file_db->save_file(NULL);
 
     json data = {
-      { "id", signature.id },
+      { "id", post_id },
+      { "hash", signature.to_string() },
+      { "signature", {
+        { "avglf", signature.avglf },
+        { "sig", signature.sig },
+      }}
     };
 
     response.set_content(data.dump(4), "application/json");
@@ -164,4 +171,6 @@ void help() {
   );
 
   exit(0);
+}
+
 }
