@@ -27,6 +27,7 @@
 
 #include <iqdb/debug.h>
 #include <iqdb/imgdb.h>
+#include <iqdb/imglib.h>
 #include <iqdb/haar_signature.h>
 
 #include <httplib.h>
@@ -59,8 +60,7 @@ void http_server(const std::string host, const int port, const std::string datab
   INFO("Starting server...\n");
 
   std::shared_mutex mutex_;
-  auto memory_db = dbSpace::load_file(database_filename.c_str(), dbSpace::mode_simple);
-  auto file_db = dbSpace::load_file(database_filename.c_str(), dbSpace::mode_alter);
+  auto memory_db = std::make_unique<dbSpaceImpl>(database_filename);
 
   install_signal_handlers();
 
@@ -77,8 +77,6 @@ void http_server(const std::string host, const int port, const std::string datab
     const auto &file = request.get_file_value("file");
     const auto signature = HaarSignature::from_file_content(file.content);
     memory_db->addImageData(post_id, signature);
-    file_db->addImageData(post_id, signature);
-    file_db->save_file(NULL);
 
     json data = {
       { "id", post_id },
@@ -99,11 +97,6 @@ void http_server(const std::string host, const int port, const std::string datab
 
     if (memory_db->hasImage(post_id)) {
       memory_db->removeImage(post_id);
-    }
-
-    if (file_db->hasImage(post_id)) {
-      file_db->removeImage(post_id);
-      file_db->save_file(NULL);
     }
 
     json data = {

@@ -1,17 +1,16 @@
+#include <vector>
+
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
-
 #include <iqdb/haar_signature.h>
 #include <iqdb/haar.h>
 #include <iqdb/imgdb.h>
 
 namespace imgdb {
 
-HaarSignature::HaarSignature(const ImgData& img_data) {
-  std::copy(std::begin(img_data.avglf), std::end(img_data.avglf), avglf);
-  std::copy(std::begin(img_data.sig1), std::end(img_data.sig1), sig[0]);
-  std::copy(std::begin(img_data.sig2), std::end(img_data.sig2), sig[1]);
-  std::copy(std::begin(img_data.sig3), std::end(img_data.sig3), sig[2]);
+HaarSignature::HaarSignature(lumin_t avglf_, signature_t sig_) {
+  std::copy(avglf_, avglf_+ 3, avglf);
+  std::copy(&sig_[0][0], &sig_[0][0] + 3*40, &sig[0][0]);
 
   std::sort(&sig[0][0], &sig[0][NUM_COEFS]);
   std::sort(&sig[1][0], &sig[1][NUM_COEFS]);

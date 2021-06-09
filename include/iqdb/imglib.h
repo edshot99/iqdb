@@ -54,6 +54,7 @@ different but the majority of the actual code is the same for both types.
 #include <iqdb/haar.h>
 #include <iqdb/imgdb.h>
 #include <iqdb/resizer.h>
+#include <iqdb/sqlite_db.h>
 
 namespace imgdb {
 
@@ -117,54 +118,6 @@ struct imageIterator : public std::vector<image_info>::iterator {
   dbSpaceImpl &m_db;
 };
 
-// Simplify reading/writing stream data.
-#define READER_WRAPPERS                                      \
-                                                             \
-  template <typename T>                                      \
-  T read() {                                                 \
-    T dummy;                                                 \
-    base_type::read((char *)&dummy, sizeof(T));              \
-    return dummy;                                            \
-  }                                                          \
-                                                             \
-  template <typename T>                                      \
-  void read(T *t) { base_type::read((char *)t, sizeof(T)); } \
-                                                             \
-  template <typename T>                                      \
-  void read(T *t, size_t n) { base_type::read((char *)t, sizeof(T) * n); }
-#define WRITER_WRAPPERS                                               \
-  template <typename T>                                               \
-  void write(const T &t) { base_type::write((char *)&t, sizeof(T)); } \
-                                                                      \
-  template <typename T>                                               \
-  void write(const T *t, size_t n) { base_type::write((char *)t, sizeof(T) * n); }
-
-class db_ifstream : public std::ifstream {
-public:
-  typedef std::ifstream base_type;
-  db_ifstream(const char *fname) : base_type(fname, std::ios::binary) {}
-  READER_WRAPPERS
-};
-
-class db_ofstream : public std::ofstream {
-public:
-  typedef std::ofstream base_type;
-  db_ofstream(const char *fname) : base_type(fname, std::ios::binary | std::ios::trunc){};
-  WRITER_WRAPPERS
-};
-
-class db_fstream : public std::fstream {
-public:
-  typedef std::fstream base_type;
-
-  db_fstream(const char *fname) {
-    open(fname, binary | in | out);
-  }
-
-  READER_WRAPPERS
-  WRITER_WRAPPERS
-};
-
 // DB space implementations.
 
 // Common function used by all implementations.
@@ -214,10 +167,8 @@ private:
 // Specific implementations.
 class dbSpaceImpl : public dbSpaceCommon {
 public:
-  dbSpaceImpl();
+  dbSpaceImpl(std::string filename = ":memory:");
   virtual ~dbSpaceImpl();
-
-  virtual void save_file(const char *filename) override;
 
   // Image queries.
   virtual sim_vector queryFromSignature(const HaarSignature& sig, size_t numres = 10) override;
@@ -225,23 +176,18 @@ public:
   // Stats.
   virtual size_t getImgCount() override;
   virtual bool hasImage(imageId id) override;
+  bool isDeleted(imageId id); // XXX id is the iqdb id
 
   // DB maintenance.
   virtual void addImageData(imageId id, const HaarSignature& signature) override;
   virtual void removeImage(imageId id) override;
+  virtual void loadDatabase(std::string filename) override;
 
 private:
   friend struct imageIterator;
 
   std::vector<image_info> &info() { return m_info; }
   imageIterator find(imageId i);
-
-  virtual void load(const char *filename) override;
-
-  bool skip_image(const imageIterator &itr);
-
-  imageIterator image_begin();
-  imageIterator image_end();
 
   sigMap m_images;
 
@@ -260,56 +206,7 @@ private:
 
   typedef bucket_set<bucket_type> buckets_t;
   buckets_t imgbuckets;
-};
-
-// Directly modify DB file on disk.
-class dbSpaceAlter : public dbSpaceCommon {
-public:
-  dbSpaceAlter(const char* filename);
-  virtual ~dbSpaceAlter();
-
-  virtual void save_file(const char *filename);
-
-  // Image queries not supported.
-  virtual sim_vector queryFromSignature(const HaarSignature& img, size_t numres = 10) { throw usage_error("Not supported in alter mode."); }
-
-  // Stats. Partially unsupported.
-  virtual size_t getImgCount();
-  virtual bool hasImage(imageId id);
-
-  // DB maintenance.
-  virtual void addImageData(imageId id, const HaarSignature& signature);
-
-  virtual void removeImage(imageId id);
-
-protected:
-  sigMap::iterator find(imageId i);
-  ImgData get_sig(size_t ind);
-
-  virtual void load(const char *filename);
-
-private:
-  void operator=(const dbSpaceAlter &);
-
-  void resize_header();
-  void move_deleted();
-
-  struct bucket_type {
-    void add(count_t index) { size++; }
-    void remove(imageId id) { size--; }
-
-    count_t size;
-  };
-
-  typedef std::vector<size_t> DeletedList;
-
-  sigMap m_images;
-  db_fstream *m_f;
-  offset_t m_hdrOff, m_sigOff, m_imgOff;
-  typedef bucket_set<bucket_type> buckets_t;
-  buckets_t m_buckets;
-  DeletedList m_deleted;
-  bool m_rewriteIDs;
+  std::unique_ptr<SqliteDB> sqlite_db_;
 };
 
 // Serialization constants

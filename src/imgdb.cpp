@@ -23,6 +23,7 @@
 
 #include <sys/mman.h>
 
+#include <algorithm>
 #include <memory>
 #include <vector>
 
@@ -30,12 +31,9 @@
 #include <iqdb/imgdb.h>
 #include <iqdb/imglib.h>
 #include <iqdb/haar_signature.h>
+#include <iqdb/sqlite_db.h>
 
 namespace imgdb {
-
-// Specializations accessing images as SigStruct* or size_t map, and imageIdIndex_map as imageId or index map.
-inline imageIterator dbSpaceImpl::image_begin() { return imageIterator(m_info.begin(), *this); }
-inline imageIterator dbSpaceImpl::image_end() { return imageIterator(m_info.end(), *this); }
 
 inline imageIterator dbSpaceImpl::find(imageId i) {
   auto itr = m_images.find(i);
@@ -44,26 +42,8 @@ inline imageIterator dbSpaceImpl::find(imageId i) {
   return imageIterator(itr, *this);
 }
 
-inline sigMap::iterator dbSpaceAlter::find(imageId i) {
-  sigMap::iterator itr = m_images.find(i);
-  if (itr == m_images.end())
-    throw invalid_id("Invalid image ID.");
-  return itr;
-}
-
 bool dbSpaceImpl::hasImage(imageId id) {
   return m_images.find(id) != m_images.end();
-}
-
-bool dbSpaceAlter::hasImage(imageId id) {
-  return m_images.find(id) != m_images.end();
-}
-
-inline ImgData dbSpaceAlter::get_sig(size_t ind) {
-  ImgData sig;
-  m_f->seekg(m_sigOff + ind * sizeof(ImgData));
-  m_f->read(&sig);
-  return sig;
 }
 
 template <typename B>
@@ -112,302 +92,40 @@ void dbSpaceImpl::addImageData(imageId post_id, const HaarSignature& signature) 
   m_images.add_index(post_id, ind);
 
   imgbuckets.add(signature, ind);
+  sqlite_db_->addImage(post_id, signature);
 }
 
-void dbSpaceAlter::addImageData(imageId post_id, const HaarSignature& signature) {
-  if (hasImage(post_id)) // image already in db
-    throw duplicate_id("Image already in database.");
+void dbSpaceImpl::loadDatabase(std::string filename) {
+  sqlite_db_ = std::make_unique<SqliteDB>(filename);
+  m_nextIndex = 0;
+  m_images.clear();
+  m_info.clear();
+  // imgbuckets.clear();
 
-  ImgData img;
-  img.id = post_id;
-  img.width = 0;
-  img.height = 0;
-  std::copy(std::begin(signature.avglf), std::end(signature.avglf), img.avglf);
-  std::copy(std::begin(signature.sig[0]), std::end(signature.sig[0]), img.sig1);
-  std::copy(std::begin(signature.sig[1]), std::end(signature.sig[1]), img.sig2);
-  std::copy(std::begin(signature.sig[2]), std::end(signature.sig[2]), img.sig3);
-
-  size_t ind;
-  if (!m_deleted.empty()) {
-    ind = m_deleted.back();
-    m_deleted.pop_back();
-  } else {
-    ind = m_images.size();
-    if (m_imgOff + ((off_t)ind + 1) * (off_t)sizeof(imageId) >= m_sigOff) {
-      resize_header();
-      if (m_imgOff + ((off_t)ind + 1) * (off_t)sizeof(imageId) >= m_sigOff)
-        throw internal_error("resize_header failed!");
-    }
-  }
-
-  if (!m_rewriteIDs) {
-    m_f->seekp(m_imgOff + ind * sizeof(imageId));
-    m_f->write(post_id);
-  }
-  m_f->seekp(m_sigOff + ind * sizeof(ImgData));
-  m_f->write(img);
-
-  m_buckets.add(signature, ind);
-  m_images[post_id] = ind;
-}
-
-void dbSpaceImpl::load(const char *filename) {
-  INFO("Loading db (simple) from %s...\n", filename);
-  db_ifstream f(filename);
-
-  if (!f.is_open()) {
-    WARN("Unable to open file %s for read ops: %s.\n", filename, strerror(errno));
-    return;
-  }
-
-  uint32_t v_code = f.read<uint32_t>();
-  uint32_t intsizes = v_code >> 8;
-  unsigned int version = v_code & 0xff;
-
-  if (intsizes != SRZ_V_SZ) {
-    throw data_error("Cannot load database with wrong endianness or data sizes");
-  } else if (version != SRZ_V0_9_0) {
-    throw data_error("Database is from an unsupported version (not 0.9.0)");
-  }
-
-  count_t numImg = f.read<count_t>();
-  offset_t firstOff = f.read<offset_t>();
-  INFO("%s has %" FMT_count_t " images at %llx.\n", filename, numImg, (long long)firstOff);
-
-  // read sigs
-  f.seekg(firstOff);
-  m_info.resize(numImg);
-  for (sigMap::size_type k = 0; k < numImg; k++) {
-    ImgData sig;
-    f.read(&sig);
-
-    HaarSignature haar(sig);
-
-    size_t ind = m_nextIndex++;
-    imgbuckets.add(haar, ind);
-
-    m_info[ind].id = sig.id;
-    image_info::avglf2i(sig.avglf, m_info[ind].avgl);
-
-    m_images.add_index(sig.id, ind);
-  }
-
-  INFO("Loaded %ld images from %s!\n", getImgCount(), filename);
-  f.close();
-}
-
-void dbSpaceAlter::load(const char *filename) {
-  INFO("Loading db (alter) from %s... \n", filename);
-  delete m_f;
-  m_f = new db_fstream(filename);
-  try {
-    if (!m_f->is_open()) {
-      // Instead of replicating code here to create the basic file structure, we'll just make a dummy DB.
-      auto dummy = std::make_unique<dbSpaceImpl>();
-      dummy->save_file(filename);
-
-      m_f->open(filename);
-      if (!m_f->is_open())
-        throw io_error("Could not create DB structure.");
-    }
-    m_f->exceptions(std::fstream::badbit | std::fstream::failbit);
-
-    uint32_t v_code = m_f->read<uint32_t>();
-    unsigned int version = v_code & 0xff;
-
-    if ((v_code >> 8) == 0) {
-      WARN("Old database version.\n");
-    } else if ((v_code >> 8) != SRZ_V_SZ) {
-      throw data_error("Database incompatible with this system");
+  sqlite_db_->eachImage([&](const auto& image, const auto& haar) {
+    if ((size_t)image.id >= m_info.size()) {
+      m_info.resize(image.id + 50000);
     }
 
-    if (version != SRZ_V0_9_0)
-      throw data_error("Only current version is supported in alter mode, upgrade first using normal mode.");
+    image_info info;
+    info.id = image.post_id;
+    info.avgl.v[0] = image.avglf1;
+    info.avgl.v[1] = image.avglf2;
+    info.avgl.v[2] = image.avglf3;
 
-    INFO("Loading db header (cur ver)...\n");
-    m_hdrOff = m_f->tellg();
-    count_t numImg = m_f->read<count_t>();
-    m_sigOff = m_f->read<offset_t>();
+    m_info[image.id] = info;
+    m_images[image.post_id] = image.id;
+    imgbuckets.add(haar, image.id);
 
-    INFO("%s has %" FMT_count_t " images.\n", filename, numImg);
-    // read bucket sizes
-    for (buckets_t::iterator itr = m_buckets.begin(); itr != m_buckets.end(); ++itr)
-      itr->size = m_f->read<count_t>();
-
-    // read IDs
-    m_imgOff = m_f->tellg();
-    for (size_t k = 0; k < numImg; k++)
-      m_images[m_f->read<count_t>()] = k;
-
-    m_rewriteIDs = false;
-    INFO("Loaded %ld images from %s!\n", getImgCount(), filename);
-  } catch (const base_error &e) {
-    if (m_f) {
-      if (m_f->is_open())
-        m_f->close();
-      delete m_f;
+    if (image.id % 10000 == 0) {
+      INFO("Loaded image %ld (post #%ld)...\n", image.id, image.post_id);
     }
-    ERROR("failed!\n");
-    throw;
-  }
+  });
 }
 
-std::unique_ptr<dbSpace> dbSpace::load_file(const char *filename, int mode) {
-  std::unique_ptr<dbSpace> db;
-
-  if (mode == dbSpaceCommon::mode_mask_alter) {
-    db = std::make_unique<dbSpaceAlter>(filename);
-  } else if (mode == dbSpaceCommon::mode_mask_simple) {
-    db = std::make_unique<dbSpaceImpl>();
-  } else {
-    throw usage_error("Unsupported database mode");
-  }
-
-  db->load(filename);
-  return db;
-}
-
-void dbSpaceImpl::save_file(const char* filename) {
-  /*
-    Serialization order:
-    [sigMap::size_type] number of images
-    [off_t] offset to first signature in file
-    for each bucket:
-    [size_t] number of images in bucket
-    for each image:
-    [imageId] image id at this index
-    ...hole in file until offset to first signature in file, to allow adding more image ids
-    then follow image signatures, see struct ImgData
-  */
-
-  INFO("Saving dummy db... ");
-
-  db_ofstream file(filename);
-
-  file.write<int32_t>(SRZ_V_CODE);
-  file.write<count_t>(m_images.size());
-
-  offset_t firstOff = 0;
-  firstOff += sizeof(int32_t) + sizeof(count_t) + sizeof(offset_t);
-  firstOff += imgbuckets.size();
-  firstOff += 1024 * sizeof(imageId); // leave space for 1024 new IDs
-
-  file.write<offset_t>(firstOff);
-
-  // save bucket sizes
-  for (buckets_t::iterator itr = imgbuckets.begin(); itr != imgbuckets.end(); ++itr)
-    file.write<count_t>(0);
-
-  INFO("done!\n");
-}
-
-// Relocate sigs from the end into the holes left by deleted images.
-void dbSpaceAlter::move_deleted() {
-  // need to find out which IDs are using the last few indices
-  DeletedList::iterator delItr = m_deleted.begin();
-  for (sigMap::iterator itr = m_images.begin();; ++itr) {
-    // Don't fill holes that are beyond the new end!
-    while (delItr != m_deleted.end() && *delItr >= m_images.size())
-      ++delItr;
-
-    if (itr == m_images.end() || delItr == m_deleted.end())
-      break;
-
-    if (itr->second < m_images.size())
-      continue;
-
-    ImgData sig = get_sig(itr->second);
-    itr->second = *delItr++;
-    m_f->seekp(m_sigOff + itr->second * sizeof(ImgData));
-    m_f->write(sig);
-
-    if (!m_rewriteIDs) {
-      m_f->seekp(m_imgOff + itr->second * sizeof(imageId));
-      m_f->write(sig.id);
-    }
-  }
-  if (delItr != m_deleted.end())
-    throw data_error("Not all deleted entries purged.");
-
-  m_deleted.clear();
-
-  // Truncate file here? Meh, it'll be appended again soon enough anyway.
-}
-
-void dbSpaceAlter::save_file(const char *filename) {
-  if (!m_f)
-    throw data_error("Couldn't save database; m_f is invalid");
-
-  INFO("saving file, %zd deleted images...\n", m_deleted.size());
-  if (!m_deleted.empty())
-    move_deleted();
-
-  if (m_rewriteIDs) {
-    INFO("Rewriting all IDs... ");
-    std::vector<imageId> ids(m_images.size(), ~imageId());
-    for (sigMap::iterator itr = m_images.begin(); itr != m_images.end(); ++itr) {
-      if (itr->second >= m_images.size())
-        throw data_error("Invalid index on save.");
-      if (ids[itr->second] != ~imageId())
-        throw data_error("Duplicate index on save.");
-      ids[itr->second] = itr->first;
-    }
-    // Shouldn't be possible.
-    if (ids.size() != m_images.size())
-      throw data_error("Image indices do not match images.");
-
-    m_f->seekp(m_imgOff);
-    m_f->write(&ids.front(), ids.size());
-    m_rewriteIDs = false;
-  }
-
-  INFO("saving header...\n");
-  m_f->seekp(0);
-  m_f->write<uint32_t>(SRZ_V_CODE);
-  m_f->seekp(m_hdrOff);
-  m_f->write<count_t>(m_images.size());
-  m_f->write(m_sigOff);
-  m_f->write(m_buckets);
-
-  INFO("done!\n");
-  m_f->flush();
-}
-
-// Need more space for image IDs in the header. Relocate first few
-// image signatures to the end of the file and use the freed space
-// for new image IDs until we run out of space again.
-void dbSpaceAlter::resize_header() {
-  // make space for 1024 new IDs
-  const size_t numrel = (1024 * sizeof(imageId) + sizeof(ImgData) - 1) / sizeof(ImgData);
-  INFO("relocating %zd/%zd images... from %llx ", numrel, m_images.size(), (long long int)m_sigOff);
-  if (m_images.size() < numrel)
-    throw internal_error("dbSpaceAlter::resize_header called with too few images!");
-  ImgData sigs[numrel];
-  m_f->seekg(m_sigOff);
-  m_f->read(sigs, numrel);
-  off_t writeOff = m_sigOff + m_images.size() * sizeof(ImgData);
-  m_sigOff = m_f->tellg();
-  INFO("to %llx (new off %llx) ", (long long int)writeOff, (long long int)m_sigOff);
-  m_f->seekp(writeOff);
-  m_f->write(sigs, numrel);
-
-  size_t addrel = m_images.size() - numrel;
-  for (sigMap::iterator itr = m_images.begin(); itr != m_images.end(); ++itr)
-    itr->second = (itr->second >= numrel ? itr->second - numrel : itr->second + addrel);
-  INFO("done.\n");
-
-  m_rewriteIDs = true;
-}
-
-struct sim_result : public imageIterator::base_type {
-  typedef typename imageIterator::base_type itr_type;
-  sim_result(Score s, const itr_type &i) : itr_type(i), score(s) {}
-  bool operator<(const sim_result &other) const { return score < other.score; }
-  Score score;
-};
-
-inline bool dbSpaceImpl::skip_image(const imageIterator &itr) {
-  return !itr.avgl().v[0];
+// XXX imageId is the iqdb id, not the post id
+bool dbSpaceImpl::isDeleted(imageId id) {
+  return !m_info[id].avgl.v[0];
 }
 
 sim_vector dbSpace::queryFromBlob(const std::string blob, int numres) {
@@ -417,20 +135,23 @@ sim_vector dbSpace::queryFromBlob(const std::string blob, int numres) {
 
 sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_t numres) {
   Score scale = 0;
-  size_t count = m_nextIndex;
-  std::vector<Score> scores(count, 0);
-  std::priority_queue<sim_result> pqResults; /* results priority queue; largest at top */
+  std::vector<Score> scores(m_info.size(), 0);
+  std::priority_queue<sim_value> pqResults; /* results priority queue; largest at top */
   sim_vector V; /* output results */
 
+  DEBUG("signature=%s\n", signature.to_string().c_str());
+  DEBUG("json signature=%s\n", signature.to_json().c_str());
+
   // Luminance score (DC coefficient).
-  for (imageIterator itr = image_begin(); itr != image_end(); ++itr) {
+  for (size_t i = 0; i < scores.size(); i++) {
+    auto image_info = m_info[i];
     Score s = 0;
 
     for (int c = 0; c < signature.num_colors(); c++) {
-      s += ((DScore)weights[0][c]) * std::abs(itr.avgl().v[c] - signature.avglf[c]);
+      s += weights[0][c] * std::abs(image_info.avgl.v[c] - signature.avglf[c]);
     }
 
-    scores[itr.index()] = s;
+    scores[i] = s;
   }
 
   for (int b = 0; b < NUM_COEFS; b++) { // for every coef on a sig
@@ -452,36 +173,28 @@ sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_
   }
 
   // Fill up the numres-bounded priority queue (largest at top):
-  imageIterator itr = image_begin();
-  while (pqResults.size() < numres && itr != image_end()) {
-    if (skip_image(itr)) {
-      ++itr;
-      continue;
-    }
-
-    pqResults.push(sim_result(scores[itr.index()], itr));
-
-    ++itr;
+  size_t i = 0;
+  for (; pqResults.size() < numres && i < scores.size(); i++) {
+    if (!isDeleted(i))
+      pqResults.emplace(i, scores[i]);
   }
 
-  for (; itr != image_end(); ++itr) {
-    if (scores[itr.index()] < pqResults.top().score) {
-      if (skip_image(itr))
-        continue;
-
+  for (; i < scores.size(); i++) {
+    if (!isDeleted(i) && scores[i] < pqResults.top().score) {
       pqResults.pop();
-      pqResults.push(sim_result(scores[itr.index()], itr));
+      pqResults.emplace(i, scores[i]);
     }
   }
 
   if (scale != 0)
-    scale = ((DScore)1) * 1.0 / scale;
+    scale = 1.0 / scale;
 
   while (!pqResults.empty()) {
-    const sim_result &curResTmp = pqResults.top();
+    auto value = pqResults.top();
+    value.id = m_info[value.id].id; // XXX replace iqdb id with post id
+    value.score = value.score * 100 * scale;
 
-    imageIterator itr(curResTmp, *this);
-    V.push_back(sim_value(itr.id(), ((DScore)curResTmp.score) * 100 * scale));
+    V.push_back(value);
     pqResults.pop();
   }
 
@@ -489,17 +202,12 @@ sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_
   return V;
 }
 
-void dbSpaceImpl::removeImage(imageId id) {
+void dbSpaceImpl::removeImage(imageId post_id) {
   // Can't efficiently remove it from buckets, just mark it as
   // invalid and remove it from query results.
-  m_info[find(id).index()].avgl.v[0] = 0;
-  m_images.erase(id);
-}
-
-void dbSpaceAlter::removeImage(imageId id) {
-  sigMap::iterator itr = find(id);
-  m_deleted.push_back(itr->second);
-  m_images.erase(itr);
+  m_info[find(post_id).index()].avgl.v[0] = 0;
+  m_images.erase(post_id);
+  sqlite_db_->removeImage(post_id);
 }
 
 template <typename B>
@@ -568,35 +276,17 @@ Score dbSpaceCommon::calcSim(imageId id1, imageId id2, bool ignore_color) {
 */
 
 size_t dbSpaceImpl::getImgCount() {
-  return m_images.size();
-}
-
-size_t dbSpaceAlter::getImgCount() {
-  return m_images.size();
+  return m_info.size();
 }
 
 dbSpace::dbSpace() {}
 dbSpace::~dbSpace() {}
 
-dbSpaceImpl::dbSpaceImpl() : m_nextIndex(0) {
-  if (imgbuckets.count() != sizeof(imgbuckets) / sizeof(imgbuckets[0][0][0]))
-    throw internal_error("bucket_set.count() is wrong!");
-}
-
-dbSpaceAlter::dbSpaceAlter(const char* filename) : m_f(NULL), m_rewriteIDs(false) {
-  m_f = new db_fstream(filename);
+dbSpaceImpl::dbSpaceImpl(std::string filename) : m_nextIndex(0), sqlite_db_(nullptr) {
+  loadDatabase(filename);
 }
 
 dbSpaceImpl::~dbSpaceImpl() {
-}
-
-dbSpaceAlter::~dbSpaceAlter() {
-  if (m_f) {
-    save_file(NULL);
-    m_f->close();
-    delete m_f;
-    m_f = NULL;
-  }
 }
 
 } // namespace imgdb

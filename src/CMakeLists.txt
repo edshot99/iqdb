@@ -7,6 +7,7 @@ target_link_libraries(
   nlohmann_json::nlohmann_json
   httplib::httplib
   fmt::fmt
+  sqlite_orm::sqlite_orm
   ${GDLIB_LIBRARIES}
 )
 

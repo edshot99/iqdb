@@ -23,8 +23,8 @@
 #include <string>
 
 #include <iqdb/debug.h>
-#include <iqdb/imgdb.h>
 #include <iqdb/server.h>
+#include <iqdb/sqlite_db.h>
 
 using namespace imgdb;
 
@@ -47,6 +47,10 @@ int main(int argc, char **argv) {
       const std::string filename = argc >= 4 ? argv[4] : "iqdb.db";
 
       http_server(host, port, filename);
+    } else if (!strcasecmp(argv[1], "convert")) {
+      const std::string input_filename = argc >= 3 ? argv[2] : "iqdb.db";
+      const std::string output_filename = argc >= 4 ? argv[3] : ":memory:";
+      SqliteDB::convertDatabase(input_filename, output_filename);
     } else {
       help();
     }

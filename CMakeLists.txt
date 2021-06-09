@@ -53,12 +53,19 @@ FetchContent_Declare(
   GIT_TAG        7.1.3
 )
 
+FetchContent_Declare(
+  sqliteOrm
+  GIT_REPOSITORY https://github.com/fnc12/sqlite_orm
+  GIT_TAG        1.6
+)
+
 FetchContent_MakeAvailable(httplib)
 FetchContent_MakeAvailable(json)
 FetchContent_MakeAvailable(Catch2)
 FetchContent_MakeAvailable(fmt)
-#FetchContent_MakeAvailable(sqliteOrm)
+FetchContent_MakeAvailable(sqliteOrm)
 
+find_package(SQLite3 REQUIRED)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GDLIB REQUIRED gdlib)

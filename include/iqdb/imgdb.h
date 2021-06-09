@@ -44,31 +44,6 @@
 
 namespace imgdb {
 
-/*
-DB file layout.
-
-Count	Size		Content
-1	int32_t		DB file version and data size code
-1	count_t		Number of images
-1	offset_t	Offset to image signatures
-98304	count_t		Bucket sizes
-num_img	imageId		Image IDs
-?	?		<unused space left for future image IDs up to above offset>
-num_img	ImgData		Image signatures
-
-When removing images would leave holes in the image signatures and they were
-not filled by new images, signatures from the end will be relocated to fill
-them. The file is not shrunk in anticipation of more images being added later.
-
-When there is no more space for image IDs in the header, a number of
-signatures are relocated from the front to the end of the file to mask space
-for new image IDs.
-
-When you need a printf statement to display a count_t, offset_t, res_t or imageId
-value, use the FMT_count_t, FMT_offset_t, FMT_res_t and FMT_imageId macros
-as format specifier, e.g. printf("%08" FMT_imageId, id).
-*/
-
 // Global typedefs and consts.
 typedef uint64_t imageId;
 typedef uint64_t count_t;
@@ -144,9 +119,10 @@ typedef struct {
 } lumin_native;
 
 struct sim_value {
-  sim_value(imageId i, Score s) : id(i), score(s) {}
   imageId id;
   Score score;
+  sim_value(imageId id, Score score) : id(id), score(score) {};
+  bool operator<(const sim_value &other) const { return score < other.score; }
 };
 
 struct image_info {
@@ -165,30 +141,10 @@ struct image_info {
 typedef std::vector<sim_value> sim_vector;
 typedef Idx sig_t[NUM_COEFS];
 
-struct ImgData {
-  ImgData() {};
-  ImgData(const std::string blob, imageId id);
-  imageId id;      /* picture id */
-  sig_t sig1;      /* Y positions with largest magnitude */
-  sig_t sig2;      /* I positions with largest magnitude */
-  sig_t sig3;      /* Q positions with largest magnitude */
-  double avglf[3]; /* YIQ for position [0,0] */
-  /* image properties extracted when opened for the first time */
-  res_t width;  /* in pixels (unused) */
-  res_t height; /* in pixels (unused) */
-};
-
-class dbSpace;
-class db_ifstream;
-class db_ofstream;
-
 class dbSpace {
 public:
   static const int mode_simple = 0x02;   // Fast queries, less memory, cannot save, no image ID queries.
   static const int mode_alter = 0x04;    // Fast add/remove/info on existing DB file, no queries.
-
-  static std::unique_ptr<dbSpace> load_file(const char *filename, int mode);
-  virtual void save_file(const char *filename) = 0;
 
   virtual ~dbSpace();
 
@@ -203,11 +159,10 @@ public:
   // DB maintenance.
   virtual void addImageData(imageId id, const HaarSignature& signature) = 0;
   virtual void removeImage(imageId id) = 0;
+  virtual void loadDatabase(std::string filename) = 0;
 
 protected:
   dbSpace();
-
-  virtual void load(const char *filename) = 0;
 
 private:
   void operator=(const dbSpace &);
