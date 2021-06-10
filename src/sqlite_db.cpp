@@ -1,3 +1,4 @@
+#include <optional>
 #include <vector>
 
 #include <iqdb/debug.h>
@@ -5,6 +6,8 @@
 #include <iqdb/sqlite_db.h>
 
 namespace imgdb {
+
+using namespace sqlite_orm;
 
 // An image in the old (non-SQLite) database format.
 struct ImgData {
@@ -23,16 +26,30 @@ static T read(std::ifstream& stream) {
   return dummy;
 }
 
-void SqliteDB::eachImage(std::function<void (const Image&, const HaarSignature&)> func) {
+HaarSignature Image::haar() const {
+  lumin_t avglf = { avglf1, avglf2, avglf3 };
+  return HaarSignature(avglf, *(signature_t*)sig.data());
+}
+
+void SqliteDB::eachImage(std::function<void (const Image&)> func) {
   for (auto& image : storage_.iterate<Image>()) {
-    lumin_t avglf = { image.avglf1, image.avglf2, image.avglf3 };
-    signature_t* sig2 = reinterpret_cast<signature_t*>(image.sig.data());
-    HaarSignature signature(avglf, *sig2);
-    func(image, signature);
+    func(image);
   }
 }
 
-void SqliteDB::addImage(int64_t post_id, HaarSignature signature) {
+std::optional<Image> SqliteDB::getImage(int64_t post_id) {
+  auto results = storage_.get_all<Image>(where(c(&Image::post_id) == post_id));
+
+  if (results.size() == 1) {
+    return results[0];
+  } else {
+    DEBUG("Couldn't find post #%ld in sqlite database.\n", post_id);
+    return std::nullopt;
+  }
+}
+
+int SqliteDB::addImage(int64_t post_id, HaarSignature signature) {
+  int id = -1;
   auto sig_ptr = (const char*)signature.sig;
   std::vector<char> sig_blob(sig_ptr, sig_ptr + sizeof(signature.sig));
   Image image {
@@ -41,13 +58,15 @@ void SqliteDB::addImage(int64_t post_id, HaarSignature signature) {
 
   storage_.transaction([&] {
     removeImage(post_id);
-    storage_.insert(image);
+    id = storage_.insert(image);
     return true;
   });
+
+  return id;
 }
 
 void SqliteDB::removeImage(int64_t post_id) {
-  storage_.remove_all<Image>(where(c(&Image::post_id) = post_id));
+  storage_.remove_all<Image>(where(c(&Image::post_id) == post_id));
 }
 
 void SqliteDB::convertDatabase(std::string input_filename, std::string output_filename) {

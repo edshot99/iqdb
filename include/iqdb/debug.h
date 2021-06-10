@@ -7,7 +7,7 @@ extern int debug_level;
 
 #define LOG(FMT, LEVEL, ...) \
   do { \
-    if (debug_level >= LEVEL) { \
+    if (LEVEL >= debug_level) { \
       fprintf(stderr, FMT, ## __VA_ARGS__); \
     } \
   } while (0)

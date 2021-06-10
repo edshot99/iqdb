@@ -98,26 +98,6 @@ struct ImgBin {
 
 constexpr static auto imgBin = ImgBin<NUM_PIXELS>();
 
-class sigMap : public std::unordered_map<imageId, size_t> {
-public:
-  void add_index(imageId id, size_t index) { (*this)[id] = index; }
-};
-
-// In simple mode, we have only the image_info data available, so iterate over that.
-// In read-only mode, we additionally have the index into the image_info array in a sigMap.
-// Using functions that rely on this in simple mode will throw a usage_error.
-struct imageIterator : public std::vector<image_info>::iterator {
-  typedef std::vector<image_info>::iterator base_type;
-  imageIterator(const base_type &itr, dbSpaceImpl &db) : base_type(itr), m_db(db) {}
-  imageIterator(const sigMap::iterator &itr, dbSpaceImpl &db); // implemented below
-
-  imageId id() const { return (*this)->id; }
-  size_t index() const; // implemented below
-  const lumin_native &avgl() const { return (*this)->avgl; }
-
-  dbSpaceImpl &m_db;
-};
-
 // DB space implementations.
 
 // Common function used by all implementations.
@@ -175,23 +155,18 @@ public:
 
   // Stats.
   virtual size_t getImgCount() override;
-  virtual bool hasImage(imageId id) override;
   bool isDeleted(imageId id); // XXX id is the iqdb id
 
   // DB maintenance.
-  virtual void addImageData(imageId id, const HaarSignature& signature) override;
+  virtual void addImage(imageId id, const HaarSignature& signature) override;
   virtual void removeImage(imageId id) override;
   virtual void loadDatabase(std::string filename) override;
 
 private:
   friend struct imageIterator;
 
-  std::vector<image_info> &info() { return m_info; }
-  imageIterator find(imageId i);
+  void addImageInMemory(imageId iqdb_id, imageId post_id, const HaarSignature& signature);
 
-  sigMap m_images;
-
-  size_t m_nextIndex;
   std::vector<image_info> m_info;
 
   /* Lists of picture ids, indexed by [color-channel][sign][position], i.e.,
@@ -200,8 +175,11 @@ private:
 
   // XXX We use a uint32_t here to reduce memory consumption.
   struct bucket_type : public std::vector<uint32_t> {
-    void add(count_t index) { push_back(index); }
-    void remove(imageId id) { throw usage_error("remove not implemented"); }
+    void add(imageId iqdb_id) { push_back(iqdb_id); }
+    void remove(imageId iqdb_id) {
+      // https://en.wikipedia.org/wiki/Erase-remove_idiom
+      erase(std::remove(begin(), end(), iqdb_id), end());
+    }
   };
 
   typedef bucket_set<bucket_type> buckets_t;
@@ -220,11 +198,6 @@ static const uint32_t SRZ_V_SZ = (sizeof(res_t)) |
                                  (3 << 20); // never matches any of the above for endian check
 
 static const uint32_t SRZ_V_CODE = (SRZ_V0_9_0) | (SRZ_V_SZ << 8);
-
-// Delayed implementations.
-inline imageIterator::imageIterator(const sigMap::iterator &itr, dbSpaceImpl &db)
-    : base_type(db.info().begin() + itr->second), m_db(db) {}
-inline size_t imageIterator::index() const { return *this - m_db.info().begin(); }
 
 } // namespace imgdb
 

@@ -23,7 +23,7 @@ HaarSignature HaarSignature::from_file_content(const std::string blob) {
   std::vector<unsigned char> gchan(NUM_PIXELS * NUM_PIXELS);
   std::vector<unsigned char> bchan(NUM_PIXELS * NUM_PIXELS);
 
-  Image image = resize_image_data((const unsigned char *)blob.data(), blob.size(), NUM_PIXELS, NUM_PIXELS);
+  auto image = resize_image_data((const unsigned char *)blob.data(), blob.size(), NUM_PIXELS, NUM_PIXELS);
 
   for (int y = 0; y < NUM_PIXELS; y++) {
     for (int x = 0; x < NUM_PIXELS; x++) {

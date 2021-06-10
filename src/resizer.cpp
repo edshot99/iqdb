@@ -34,17 +34,17 @@ image_types get_image_info(const unsigned char *data, size_t length) {
   }
 }
 
-Image resize_image_data(const unsigned char *data, size_t len, unsigned int thu_x, unsigned int thu_y) {
+RawImage resize_image_data(const unsigned char *data, size_t len, unsigned int thu_x, unsigned int thu_y) {
   auto type = get_image_info(data, len);
 
   if (type != IMG_JPEG)
     throw imgdb::image_error("Unsupported image format.");
 
-  Image thu(gdImageCreateTrueColor(thu_x, thu_y), &gdImageDestroy);
+  RawImage thu(gdImageCreateTrueColor(thu_x, thu_y), &gdImageDestroy);
   if (!thu)
     throw imgdb::simple_error("Out of memory.");
 
-  Image img(gdImageCreateFromJpegPtr(len, const_cast<unsigned char *>(data)), &gdImageDestroy);
+  RawImage img(gdImageCreateFromJpegPtr(len, const_cast<unsigned char *>(data)), &gdImageDestroy);
   if (!img)
     throw imgdb::image_error("Could not read image.");
 

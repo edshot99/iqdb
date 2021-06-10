@@ -154,10 +154,9 @@ public:
 
   // Stats.
   virtual size_t getImgCount() = 0;
-  virtual bool hasImage(imageId id) = 0;
 
   // DB maintenance.
-  virtual void addImageData(imageId id, const HaarSignature& signature) = 0;
+  virtual void addImage(imageId id, const HaarSignature& signature) = 0;
   virtual void removeImage(imageId id) = 0;
   virtual void loadDatabase(std::string filename) = 0;
 

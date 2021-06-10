@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,8 @@ struct Image {
   double avglf2;
   double avglf3;
   std::vector<char> sig; // The `int16_t sig[3][40]` array, stored as a binary blob.
+
+  HaarSignature haar() const;
 };
 
 // Initialize the database, creating the table if it doesn't exist.
@@ -48,14 +51,17 @@ public:
   // Open database at path. Default to a temporary memory-only database.
   SqliteDB(const std::string& path = ":memory:") : storage_(initStorage(path)) {};
 
-  // Add the image to the database. Replace the image if it already exists.
-  void addImage(int64_t post_id, HaarSignature signature);
+  // Get an image from the database, if it exists.
+  std::optional<Image> getImage(int64_t post_id);
+
+  // Add the image to the database. Replace the image if it already exists. Returns the internal IQDB id.
+  int addImage(int64_t post_id, HaarSignature signature);
 
   // Remove the image from the database.
   void removeImage(int64_t post_id);
 
   // Call a function for each image in the database.
-  void eachImage(std::function<void (const Image&, const HaarSignature&)>);
+  void eachImage(std::function<void (const Image&)>);
 
   // Convert a database from the old IQDB format to the new SQLite format.
   static void convertDatabase(std::string input_filename, std::string output_filename);

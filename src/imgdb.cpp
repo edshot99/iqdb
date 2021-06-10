@@ -35,24 +35,13 @@
 
 namespace imgdb {
 
-inline imageIterator dbSpaceImpl::find(imageId i) {
-  auto itr = m_images.find(i);
-  if (itr == m_images.end())
-    throw invalid_id("Invalid image ID.");
-  return imageIterator(itr, *this);
-}
-
-bool dbSpaceImpl::hasImage(imageId id) {
-  return m_images.find(id) != m_images.end();
-}
-
 template <typename B>
-inline void dbSpaceCommon::bucket_set<B>::add(const HaarSignature &nsig, count_t index) {
+inline void dbSpaceCommon::bucket_set<B>::add(const HaarSignature &nsig, imageId iqdb_id) {
   for (int c = 0; c < nsig.num_colors(); c++) {
     for (int i = 0; i < NUM_COEFS; i++) {
       int coef = nsig.sig[c][i];
       int s = coef < 0;
-      buckets[c][s][abs(coef)].add(index);
+      buckets[c][s][abs(coef)].add(iqdb_id);
     }
   }
 }
@@ -75,57 +64,47 @@ inline B &dbSpaceCommon::bucket_set<B>::at(int col, int coeff, int *idxret) {
   return buckets[col][pn][idx];
 }
 
-void dbSpaceImpl::addImageData(imageId post_id, const HaarSignature& signature) {
-  if (hasImage(post_id)) // image already in db
-    throw duplicate_id("Image already in database.");
+void dbSpaceImpl::addImage(imageId post_id, const HaarSignature& haar) {
+  removeImage(post_id);
+  int iqdb_id = sqlite_db_->addImage(post_id, haar);
+  addImageInMemory(iqdb_id, post_id, haar);
 
-  size_t ind = m_nextIndex++;
-  if (ind > m_info.size())
-    throw internal_error("Index incremented too much!");
-  if (ind == m_info.size()) {
-    if (ind >= m_info.capacity())
-      m_info.reserve(10 + ind + ind / 40);
-    m_info.resize(ind + 1);
+  DEBUG("Added post #%ld to memory and database (iqdb=%d haar=%s).\n", post_id, iqdb_id, haar.to_string().c_str());
+}
+
+void dbSpaceImpl::addImageInMemory(imageId iqdb_id, imageId post_id, const HaarSignature& haar) {
+  if ((size_t)iqdb_id >= m_info.size()) {
+    DEBUG("Growing m_info array (size=%ld).\n", m_info.size());
+    m_info.resize(iqdb_id + 50000);
   }
-  m_info.at(ind).id = post_id;
-  image_info::avglf2i(signature.avglf, m_info[ind].avgl);
-  m_images.add_index(post_id, ind);
 
-  imgbuckets.add(signature, ind);
-  sqlite_db_->addImage(post_id, signature);
+  imgbuckets.add(haar, iqdb_id);
+
+  image_info& info = m_info.at(iqdb_id);
+  info.id = post_id;
+  info.avgl.v[0] = haar.avglf[0];
+  info.avgl.v[1] = haar.avglf[1];
+  info.avgl.v[2] = haar.avglf[2];
 }
 
 void dbSpaceImpl::loadDatabase(std::string filename) {
   sqlite_db_ = std::make_unique<SqliteDB>(filename);
-  m_nextIndex = 0;
-  m_images.clear();
   m_info.clear();
-  // imgbuckets.clear();
+  imgbuckets = bucket_set<bucket_type>();
 
-  sqlite_db_->eachImage([&](const auto& image, const auto& haar) {
-    if ((size_t)image.id >= m_info.size()) {
-      m_info.resize(image.id + 50000);
-    }
+  sqlite_db_->eachImage([&](const auto& image) {
+    addImageInMemory(image.id, image.post_id, image.haar());
 
-    image_info info;
-    info.id = image.post_id;
-    info.avgl.v[0] = image.avglf1;
-    info.avgl.v[1] = image.avglf2;
-    info.avgl.v[2] = image.avglf3;
-
-    m_info[image.id] = info;
-    m_images[image.post_id] = image.id;
-    imgbuckets.add(haar, image.id);
-
-    if (image.id % 10000 == 0) {
+    if (image.id % 250000 == 0) {
       INFO("Loaded image %ld (post #%ld)...\n", image.id, image.post_id);
     }
   });
+
+  INFO("Loaded %ld images from %s.\n", getImgCount(), filename.c_str());
 }
 
-// XXX imageId is the iqdb id, not the post id
-bool dbSpaceImpl::isDeleted(imageId id) {
-  return !m_info[id].avgl.v[0];
+bool dbSpaceImpl::isDeleted(imageId iqdb_id) {
+  return !m_info.at(iqdb_id).avgl.v[0];
 }
 
 sim_vector dbSpace::queryFromBlob(const std::string blob, int numres) {
@@ -139,8 +118,7 @@ sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_
   std::priority_queue<sim_value> pqResults; /* results priority queue; largest at top */
   sim_vector V; /* output results */
 
-  DEBUG("signature=%s\n", signature.to_string().c_str());
-  DEBUG("json signature=%s\n", signature.to_json().c_str());
+  DEBUG("Querying signature=%s json=%s\n", signature.to_string().c_str(), signature.to_json().c_str());
 
   // Luminance score (DC coefficient).
   for (size_t i = 0; i < scores.size(); i++) {
@@ -203,20 +181,26 @@ sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_
 }
 
 void dbSpaceImpl::removeImage(imageId post_id) {
-  // Can't efficiently remove it from buckets, just mark it as
-  // invalid and remove it from query results.
-  m_info[find(post_id).index()].avgl.v[0] = 0;
-  m_images.erase(post_id);
+  auto image = sqlite_db_->getImage(post_id);
+  if (image == std::nullopt) {
+    WARN("Couldn't remove post #%ld; post not in sqlite database.\n", post_id);
+    return;
+  }
+
+  imgbuckets.remove(image->haar(), image->id);
+  m_info.at(image->id).avgl.v[0] = 0;
   sqlite_db_->removeImage(post_id);
+
+  DEBUG("Removed post #%ld from memory and database.\n", post_id);
 }
 
 template <typename B>
-inline void dbSpaceCommon::bucket_set<B>::remove(const HaarSignature &nsig, imageId post_id) {
+inline void dbSpaceCommon::bucket_set<B>::remove(const HaarSignature &nsig, imageId iqdb_id) {
   for (int c = 0; c < nsig.num_colors(); c++) {
     for (int i = 0; i < NUM_COEFS; i++) {
       int coef = nsig.sig[c][i];
       int s = coef < 0;
-      buckets[c][s][abs(coef)].remove(post_id);
+      buckets[c][s][abs(coef)].remove(iqdb_id);
     }
   }
 }
@@ -282,7 +266,7 @@ size_t dbSpaceImpl::getImgCount() {
 dbSpace::dbSpace() {}
 dbSpace::~dbSpace() {}
 
-dbSpaceImpl::dbSpaceImpl(std::string filename) : m_nextIndex(0), sqlite_db_(nullptr) {
+dbSpaceImpl::dbSpaceImpl(std::string filename) : sqlite_db_(nullptr) {
   loadDatabase(filename);
 }
 
