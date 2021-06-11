@@ -54,14 +54,8 @@ int main(int argc, char **argv) {
     } else {
       help();
     }
-
-    // Handle this specially because it means we need to fix the DB before restarting :(
-  } catch (const imgdb::data_error &err) {
-    INFO("Data error: %s.\n", err.what());
-    exit(10);
-
   } catch (const imgdb::base_error &err) {
-    INFO("Caught error %s: %s.\n", err.type(), err.what());
+    INFO("Error: %s.\n", err.what());
     if (errno)
       perror("Last system error");
   }

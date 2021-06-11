@@ -34,18 +34,7 @@
 /* Number of Haar coeffients we retain as signature for an image. */
 #define NUM_COEFS 40
 
-#define UNIT_IS_DOUBLE
-
-#undef ABS
-#ifdef UNIT_IS_DOUBLE
-#define ABS(x) fabs(x)
 typedef double Unit;
-#else
-#define UNIT_IS_INT
-#define ABS(x) abs(x)
-typedef int Unit;
-#endif
-
 typedef int16_t Idx;
 
 /* signature structure */
@@ -58,9 +47,6 @@ typedef struct valStruct_ {
   }
 } valStruct;
 
-typedef std::priority_queue<valStruct> valqueue;
-
-void initImgBin();
 void transform(Unit *a, Unit *b, Unit *c);
 void transformChar(unsigned char *c1, unsigned char *c2, unsigned char *c3, Unit *a, Unit *b, Unit *c);
 int calcHaar(Unit *cdata1, Unit *cdata2, Unit *cdata3, Idx *sig1, Idx *sig2, Idx *sig3, double *avgl);

@@ -1,3 +1,5 @@
+#include <fstream>
+#include <iostream>
 #include <optional>
 #include <vector>
 
@@ -89,19 +91,19 @@ void SqliteDB::convertDatabase(std::string input_filename, std::string output_fi
   unsigned int version = v_code & 0xff;
 
   if (intsizes != SRZ_V_SZ) {
-    throw data_error("Cannot load database with wrong endianness or data sizes");
+    throw fatal_error("Cannot load database with wrong endianness or data sizes");
   } else if (version != SRZ_V0_9_0) {
-    throw data_error("Database is from an unsupported version (not 0.9.0)");
+    throw fatal_error("Database is from an unsupported version (not 0.9.0)");
   }
 
-  count_t numImg = read<count_t>(f);
-  offset_t sigOffset = read<offset_t>(f);
+  uint64_t numImg = read<uint64_t>(f);
+  uint64_t sigOffset = read<uint64_t>(f);
   f.seekg(sigOffset);
 
-  INFO("%s has %" FMT_count_t " images at %llx.\n", input_filename.c_str(), numImg, (long long)sigOffset);
+  INFO("%s has %ld images at %lx.\n", input_filename.c_str(), numImg, sigOffset);
 
   storage.transaction([&] {
-    for (count_t k = 0; k < numImg; k++) {
+    for (uint64_t k = 0; k < numImg; k++) {
       ImgData img = read<ImgData>(f);
 
       std::sort(&img.sig[0][0], &img.sig[0][NUM_COEFS]);

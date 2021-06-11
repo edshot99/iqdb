@@ -172,20 +172,20 @@ inline static void
 get_m_largests(Unit *cdata, Idx *sig) {
   int cnt, i;
   valStruct val;
-  valqueue vq; // dynamic priority queue of valStruct's
+  std::priority_queue<valStruct> vq; // dynamic priority queue of valStruct's
 
   // Could skip i=0: goes into separate avgl
 
   // Fill up the bounded queue. (Assuming NUM_PIXELS_SQUARED > NUM_COEFS)
   for (i = 1; i < NUM_COEFS + 1; i++) {
     val.i = i;
-    val.d = ABS(cdata[i]);
+    val.d = fabs(cdata[i]);
     vq.push(val);
   }
   // Queue is full (size is NUM_COEFS)
 
   for (/*i = NUM_COEFS+1*/; i < NUM_PIXELS_SQUARED; i++) {
-    val.d = ABS(cdata[i]);
+    val.d = fabs(cdata[i]);
 
     if (val.d > vq.top().d) {
       // Make room by dropping smallest entry:

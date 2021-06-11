@@ -26,6 +26,10 @@
 #include <iqdb/imgdb.h>
 #include <iqdb/resizer.h>
 
+namespace imgdb {
+
+enum image_types { IMG_UNKNOWN, IMG_JPEG };
+
 image_types get_image_info(const unsigned char *data, size_t length) {
   if (length >= 2 && data[0] == 0xff && data[1] == 0xd8) {
     return IMG_JPEG;
@@ -38,15 +42,15 @@ RawImage resize_image_data(const unsigned char *data, size_t len, unsigned int t
   auto type = get_image_info(data, len);
 
   if (type != IMG_JPEG)
-    throw imgdb::image_error("Unsupported image format.");
+    throw image_error("Unsupported image format.");
 
   RawImage thu(gdImageCreateTrueColor(thu_x, thu_y), &gdImageDestroy);
   if (!thu)
-    throw imgdb::simple_error("Out of memory.");
+    throw image_error("Out of memory.");
 
   RawImage img(gdImageCreateFromJpegPtr(len, const_cast<unsigned char *>(data)), &gdImageDestroy);
   if (!img)
-    throw imgdb::image_error("Could not read image.");
+    throw image_error("Could not read image.");
 
   if ((unsigned int)img->sx == thu_x && (unsigned int)img->sy == thu_y && gdImageTrueColor(img))
     return img;
@@ -55,4 +59,6 @@ RawImage resize_image_data(const unsigned char *data, size_t len, unsigned int t
   DEBUG("Resized %d x %d to %d x %d.\n", img->sx, img->sy, thu_x, thu_y);
 
   return thu;
+}
+
 }

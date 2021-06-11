@@ -35,33 +35,32 @@
 
 namespace imgdb {
 
-template <typename B>
-inline void dbSpaceCommon::bucket_set<B>::add(const HaarSignature &nsig, imageId iqdb_id) {
-  for (int c = 0; c < nsig.num_colors(); c++) {
-    for (int i = 0; i < NUM_COEFS; i++) {
-      int coef = nsig.sig[c][i];
-      int s = coef < 0;
-      buckets[c][s][abs(coef)].add(iqdb_id);
-    }
-  }
+void bucket_set::add(const HaarSignature &sig, imageId iqdb_id) {
+  eachBucket(sig, [&](auto& bucket) {
+    bucket.push_back(iqdb_id);
+  });
 }
 
-template <typename B>
-inline B &dbSpaceCommon::bucket_set<B>::at(int col, int coeff, int *idxret) {
-  int pn, idx;
+void bucket_set::remove(const HaarSignature &sig, imageId iqdb_id) {
+  eachBucket(sig, [&](auto& bucket) {
+    // https://en.wikipedia.org/wiki/Erase-remove_idiom
+    bucket.erase(std::remove(bucket.begin(), bucket.end(), iqdb_id), bucket.end());
+  });
+}
 
-  pn = 0;
-  if (coeff > 0) {
-    pn = 0;
-    idx = coeff;
-  } else {
-    pn = 1;
-    idx = -coeff;
+bucket_t& bucket_set::at(int color, int coef) {
+  const int sign = coef < 0;
+  return buckets[color][sign][abs(coef)];
+}
+
+void bucket_set::eachBucket(const HaarSignature &sig, std::function<void(bucket_t&)> func) {
+  for (int c = 0; c < sig.num_colors(); c++) {
+    for (int i = 0; i < NUM_COEFS; i++) {
+      const int coef = sig.sig[c][i];
+      auto& bucket = at(c, coef);
+      func(bucket);
+    }
   }
-
-  if (idxret)
-    *idxret = idx;
-  return buckets[col][pn][idx];
 }
 
 void dbSpaceImpl::addImage(imageId post_id, const HaarSignature& haar) {
@@ -90,7 +89,7 @@ void dbSpaceImpl::addImageInMemory(imageId iqdb_id, imageId post_id, const HaarS
 void dbSpaceImpl::loadDatabase(std::string filename) {
   sqlite_db_ = std::make_unique<SqliteDB>(filename);
   m_info.clear();
-  imgbuckets = bucket_set<bucket_type>();
+  imgbuckets = bucket_set();
 
   sqlite_db_->eachImage([&](const auto& image) {
     addImageInMemory(image.id, image.post_id, image.haar());
@@ -132,15 +131,15 @@ sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_
     scores[i] = s;
   }
 
-  for (int b = 0; b < NUM_COEFS; b++) { // for every coef on a sig
-    for (int c = 0; c < signature.num_colors(); c++) {
-      int idx;
-      bucket_type &bucket = imgbuckets.at(c, signature.sig[c][b], &idx);
+  for (int c = 0; c < signature.num_colors(); c++) {
+    for (int b = 0; b < NUM_COEFS; b++) { // for every coef on a sig
+      const int coef = signature.sig[c][b];
+      auto &bucket = imgbuckets.at(c, coef);
 
       if (bucket.empty())
         continue;
 
-      const int w = imgBin.bin[idx];
+      const int w = imgBin.bin[abs(coef)];
       Score weight = weights[w][c];
       scale -= weight;
 
@@ -192,17 +191,6 @@ void dbSpaceImpl::removeImage(imageId post_id) {
   sqlite_db_->removeImage(post_id);
 
   DEBUG("Removed post #%ld from memory and database.\n", post_id);
-}
-
-template <typename B>
-inline void dbSpaceCommon::bucket_set<B>::remove(const HaarSignature &nsig, imageId iqdb_id) {
-  for (int c = 0; c < nsig.num_colors(); c++) {
-    for (int i = 0; i < NUM_COEFS; i++) {
-      int coef = nsig.sig[c][i];
-      int s = coef < 0;
-      buckets[c][s][abs(coef)].remove(iqdb_id);
-    }
-  }
 }
 
 /*

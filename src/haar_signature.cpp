@@ -5,6 +5,7 @@
 #include <iqdb/haar_signature.h>
 #include <iqdb/haar.h>
 #include <iqdb/imgdb.h>
+#include <iqdb/resizer.h>
 
 namespace imgdb {
 

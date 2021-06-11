@@ -45,20 +45,11 @@ different but the majority of the actual code is the same for both types.
 #ifndef IMGDBLIB_H
 #define IMGDBLIB_H
 
-#include <algorithm>
-#include <list>
-
-#include <fstream>
-#include <iostream>
-
 #include <iqdb/haar.h>
 #include <iqdb/imgdb.h>
-#include <iqdb/resizer.h>
 #include <iqdb/sqlite_db.h>
 
 namespace imgdb {
-
-class dbSpaceImpl;
 
 // Weights for the Haar coefficients.
 // Straight from the referenced paper:
@@ -98,54 +89,26 @@ struct ImgBin {
 
 constexpr static auto imgBin = ImgBin<NUM_PIXELS>();
 
-// DB space implementations.
+using bucket_t = std::vector<uint32_t>;
 
-// Common function used by all implementations.
-class dbSpaceCommon : public dbSpace {
+class bucket_set {
 public:
-  static const int mode_mask_simple = 0x02;
-  static const int mode_mask_alter = 0x04;
-
-protected:
-  template <typename B>
-  class bucket_set {
-  public:
-    static const size_t count_0 = 3;     // Colors
-    static const size_t count_1 = 2;     // Coefficient signs.
-    static const size_t count_2 = 16384; // Coefficient magnitudes.
-
-    // Do some sanity checking to ensure the array is layed out how we think it is layed out.
-    // (Otherwise the iterators will be broken.)
-    bucket_set() {
-      if ((size_t)(end() - begin()) != count() || (size_t)((char *)end() - (char *)begin()) != size() || size() != sizeof(*this))
-        throw internal_error("bucket_set array packed badly.");
-    }
-
-    typedef B *iterator;
-    typedef B colbucket[count_1][count_2];
-
-    colbucket &operator[](size_t ind) { return buckets[ind]; }
-    B &at(int col, int coef, int *idxret = NULL);
-
-    void add(const HaarSignature &sig, count_t index);
-    void remove(const HaarSignature &sig, imageId post_id);
-
-    iterator begin() { return buckets[0][0]; }
-    iterator end() { return buckets[count_0][0]; }
-
-    static count_t count() { return count_0 * count_1 * count_2; }
-    static count_t size() { return count() * sizeof(B); }
-
-  private:
-    colbucket buckets[count_0];
-  };
+  bucket_t& at(int col, int coef);
+  void add(const HaarSignature &sig, imageId iqdb_id);
+  void remove(const HaarSignature &sig, imageId iqdb_id);
+  void eachBucket(const HaarSignature &sig, std::function<void(bucket_t&)> func);
 
 private:
-  void operator=(const dbSpaceCommon &);
+  static const size_t n_colors  = 3;                     // 3 color channels (YIQ)
+  static const size_t n_signs   = 2;                     // 2 Haar coefficient signs (positive and negative)
+  static const size_t n_indexes = NUM_PIXELS*NUM_PIXELS; // 16384 Haar matrix indexes (128*128)
+
+  // 3 * 2 * 16384 = 98304 total buckets
+  bucket_t buckets[n_colors][n_signs][n_indexes];
 };
 
 // Specific implementations.
-class dbSpaceImpl : public dbSpaceCommon {
+class dbSpaceImpl : public dbSpace {
 public:
   dbSpaceImpl(std::string filename = ":memory:");
   virtual ~dbSpaceImpl();
@@ -163,38 +126,21 @@ public:
   virtual void loadDatabase(std::string filename) override;
 
 private:
-  friend struct imageIterator;
-
   void addImageInMemory(imageId iqdb_id, imageId post_id, const HaarSignature& signature);
 
   std::vector<image_info> m_info;
-
-  /* Lists of picture ids, indexed by [color-channel][sign][position], i.e.,
-	   R=0/G=1/B=2, pos=0/neg=1, (i*NUM_PIXELS+j)
-	 */
-
-  // XXX We use a uint32_t here to reduce memory consumption.
-  struct bucket_type : public std::vector<uint32_t> {
-    void add(imageId iqdb_id) { push_back(iqdb_id); }
-    void remove(imageId iqdb_id) {
-      // https://en.wikipedia.org/wiki/Erase-remove_idiom
-      erase(std::remove(begin(), end(), iqdb_id), end());
-    }
-  };
-
-  typedef bucket_set<bucket_type> buckets_t;
-  buckets_t imgbuckets;
   std::unique_ptr<SqliteDB> sqlite_db_;
+  bucket_set imgbuckets;
 };
 
 // Serialization constants
 static const unsigned int SRZ_V0_9_0 = 9;
 
 // Variable size and endianness check
-static const uint32_t SRZ_V_SZ = (sizeof(res_t)) |
-                                 (sizeof(count_t) << 5) |
-                                 (sizeof(offset_t) << 10) |
-                                 (sizeof(imageId) << 15) |
+static const uint32_t SRZ_V_SZ = (sizeof(uint64_t)) |
+                                 (sizeof(uint64_t) << 5) |
+                                 (sizeof(uint64_t) << 10) |
+                                 (sizeof(uint64_t) << 15) |
                                  (3 << 20); // never matches any of the above for endian check
 
 static const uint32_t SRZ_V_CODE = (SRZ_V0_9_0) | (SRZ_V_SZ << 8);
