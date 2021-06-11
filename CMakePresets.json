@@ -1,0 +1,48 @@
+{
+  "version": 2,
+  "configurePresets": [
+    {
+      "name": "default",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "generator": "Unix Makefiles"
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "hidden": true,
+      "jobs": 8,
+      "nativeToolOptions": ["--no-print-directory"]
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "configurePreset": "debug",
+      "inherits": "default",
+      "verbose": true
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "configurePreset": "release",
+      "inherits": "default"
+    }
+  ]
+}

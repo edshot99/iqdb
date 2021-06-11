@@ -1,18 +1,16 @@
 .PHONY: release debug clean docker
 
-all: release
+release: build/release
+	cmake --build --preset release
 
 debug: build/debug
-	cmake --build build/debug -j $(shell nproc) --verbose -- --no-print-directory
-
-release: build/release
-	cmake --build build/release -j $(shell nproc) -- --no-print-directory
-
-build/debug:
-	cmake -B build/debug -DCMAKE_BUILD_TYPE=Debug
+	cmake --build --preset debug
 
 build/release:
-	cmake -B build/release -DCMAKE_BUILD_TYPE=Release
+	cmake --preset release
+
+build/debug:
+	cmake --preset debug
 
 clean:
 	rm -rf build
