@@ -56,7 +56,7 @@ RawImage resize_image_data(const unsigned char *data, size_t len, unsigned int t
     return img;
 
   gdImageCopyResampled(thu.get(), img.get(), 0, 0, 0, 0, thu_x, thu_y, img->sx, img->sy);
-  DEBUG("Resized %d x %d to %d x %d.\n", img->sx, img->sy, thu_x, thu_y);
+  DEBUG("Resized {} x {} to {} x {}.\n", img->sx, img->sy, thu_x, thu_y);
 
   return thu;
 }

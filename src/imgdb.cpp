@@ -68,12 +68,12 @@ void dbSpaceImpl::addImage(imageId post_id, const HaarSignature& haar) {
   int iqdb_id = sqlite_db_->addImage(post_id, haar);
   addImageInMemory(iqdb_id, post_id, haar);
 
-  DEBUG("Added post #%ld to memory and database (iqdb=%d haar=%s).\n", post_id, iqdb_id, haar.to_string().c_str());
+  DEBUG("Added post #{} to memory and database (iqdb={} haar={}).\n", post_id, iqdb_id, haar.to_string());
 }
 
 void dbSpaceImpl::addImageInMemory(imageId iqdb_id, imageId post_id, const HaarSignature& haar) {
   if ((size_t)iqdb_id >= m_info.size()) {
-    DEBUG("Growing m_info array (size=%ld).\n", m_info.size());
+    DEBUG("Growing m_info array (size={}).\n", m_info.size());
     m_info.resize(iqdb_id + 50000);
   }
 
@@ -95,11 +95,11 @@ void dbSpaceImpl::loadDatabase(std::string filename) {
     addImageInMemory(image.id, image.post_id, image.haar());
 
     if (image.id % 250000 == 0) {
-      INFO("Loaded image %ld (post #%ld)...\n", image.id, image.post_id);
+      INFO("Loaded image {} (post #{})...\n", image.id, image.post_id);
     }
   });
 
-  INFO("Loaded %ld images from %s.\n", getImgCount(), filename.c_str());
+  INFO("Loaded {} images from {}.\n", getImgCount(), filename);
 }
 
 bool dbSpaceImpl::isDeleted(imageId iqdb_id) {
@@ -117,7 +117,7 @@ sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_
   std::priority_queue<sim_value> pqResults; /* results priority queue; largest at top */
   sim_vector V; /* output results */
 
-  DEBUG("Querying signature=%s json=%s\n", signature.to_string().c_str(), signature.to_json().c_str());
+  DEBUG("Querying signature={} json={}\n", signature.to_string(), signature.to_json());
 
   // Luminance score (DC coefficient).
   for (size_t i = 0; i < scores.size(); i++) {
@@ -182,7 +182,7 @@ sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_
 void dbSpaceImpl::removeImage(imageId post_id) {
   auto image = sqlite_db_->getImage(post_id);
   if (image == std::nullopt) {
-    WARN("Couldn't remove post #%ld; post not in sqlite database.\n", post_id);
+    WARN("Couldn't remove post #{}; post not in sqlite database.\n", post_id);
     return;
   }
 
@@ -190,7 +190,7 @@ void dbSpaceImpl::removeImage(imageId post_id) {
   m_info.at(image->id).avgl.v[0] = 0;
   sqlite_db_->removeImage(post_id);
 
-  DEBUG("Removed post #%ld from memory and database.\n", post_id);
+  DEBUG("Removed post #{} from memory and database.\n", post_id);
 }
 
 /*

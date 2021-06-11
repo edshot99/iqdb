@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
 
     if (!strncmp(argv[1], "-d=", 3)) {
       debug_level = strtol(argv[1] + 3, NULL, 0);
-      INFO("Debug level set to %x\n", debug_level);
+      INFO("Debug level set to {}\n", debug_level);
       argv++;
       argc--;
     }
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
       help();
     }
   } catch (const imgdb::base_error &err) {
-    INFO("Error: %s.\n", err.what());
+    INFO("Error: {}.\n", err.what());
     if (errno)
       perror("Last system error");
   }

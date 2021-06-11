@@ -1,20 +1,35 @@
 #ifndef IQDB_DEBUG_H
 #define IQDB_DEBUG_H
 
-#include <cstdio>
+#include <fmt/format.h>
 
 extern int debug_level;
 
-#define LOG(FMT, LEVEL, ...) \
-  do { \
-    if (LEVEL >= debug_level) { \
-      fprintf(stderr, FMT, ## __VA_ARGS__); \
-    } \
-  } while (0)
+template<typename... Args>
+inline void LOG(std::string format, int level, Args... args) {
+  if (level >= debug_level) {
+    fmt::print(stderr, format, args...); \
+  }
+}
 
-#define DEBUG(fmt, ...) LOG("[debug] " fmt, 0, ## __VA_ARGS__)
-#define ERROR(fmt, ...) LOG("[error] " fmt, 1, ## __VA_ARGS__)
-#define WARN(fmt, ...)  LOG("[warn] "  fmt, 2, ## __VA_ARGS__)
-#define INFO(fmt, ...)  LOG("[info] "  fmt, 3, ## __VA_ARGS__)
+template<typename... Args>
+inline void DEBUG(std::string format, Args... args) {
+  LOG("[debug] " + format, 0, args...);
+}
+
+template<typename... Args>
+inline void ERROR(std::string format, Args... args) {
+  LOG("[error] " + format, 1, args...);
+}
+
+template<typename... Args>
+inline void WARN(std::string format, Args... args) {
+  LOG("[warn] " + format, 2, args...);
+}
+
+template<typename... Args>
+inline void INFO(std::string format, Args... args) {
+  LOG("[info] " + format, 3, args...);
+}
 
 #endif // IQDB_DEBUG_H

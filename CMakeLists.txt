@@ -15,6 +15,11 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -flto -march=x86-64 -DNDEBUG")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# Disable GNU-specific C++-17 features.
+# https://cmake.org/cmake/help/latest/prop_tgt/CXX_EXTENSIONS.html#prop_tgt:CXX_EXTENSIONS
+# https://gcc.gnu.org/onlinedocs/gcc/C_002b_002b-Extensions.html
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 # https://stackoverflow.com/questions/1620918/cmake-and-libpthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 

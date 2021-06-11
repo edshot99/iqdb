@@ -45,7 +45,7 @@ std::optional<Image> SqliteDB::getImage(int64_t post_id) {
   if (results.size() == 1) {
     return results[0];
   } else {
-    DEBUG("Couldn't find post #%ld in sqlite database.\n", post_id);
+    DEBUG("Couldn't find post #{} in sqlite database.\n", post_id);
     return std::nullopt;
   }
 }
@@ -72,13 +72,13 @@ void SqliteDB::removeImage(int64_t post_id) {
 }
 
 void SqliteDB::convertDatabase(std::string input_filename, std::string output_filename) {
-  INFO("Converting db from %s to %s...\n", input_filename.c_str(), output_filename.c_str());
+  INFO("Converting db from {} to {}...\n", input_filename, output_filename);
 
   std::ifstream f(input_filename, std::ios::in | std::ios::binary);
   f.exceptions(std::ifstream::failbit | std::ifstream::badbit | std::ifstream::eofbit);
 
   if (!f.is_open()) {
-    WARN("Unable to open file %s for conversion: %s.\n", input_filename.c_str(), strerror(errno));
+    WARN("Unable to open file {} for conversion: {}.\n", input_filename, strerror(errno));
     return;
   }
 
@@ -100,7 +100,7 @@ void SqliteDB::convertDatabase(std::string input_filename, std::string output_fi
   uint64_t sigOffset = read<uint64_t>(f);
   f.seekg(sigOffset);
 
-  INFO("%s has %ld images at %lx.\n", input_filename.c_str(), numImg, sigOffset);
+  INFO("{} has {} images at {:x}.\n", input_filename, numImg, sigOffset);
 
   storage.transaction([&] {
     for (uint64_t k = 0; k < numImg; k++) {
@@ -117,18 +117,18 @@ void SqliteDB::convertDatabase(std::string input_filename, std::string output_fi
           0, (uint32_t)img.post_id, img.avglf[0], img.avglf[1], img.avglf[2], sig_blob
         });
       } catch (const std::system_error& err) { // thrown when post_id uniqueness constraint fails
-        INFO("Skipping duplicate post #%ld\n", img.post_id);
+        INFO("Skipping duplicate post #{}\n", img.post_id);
       }
 
       if (k % 10000 == 0) {
-        INFO("Image %ld (post #%ld)...\n", k, img.post_id);
+        INFO("Image {} (post #{})...\n", k, img.post_id);
       }
     }
 
     return true;
   });
 
-  INFO("Converted database from %s!\n", input_filename.c_str());
+  INFO("Converted database from {}!\n", input_filename);
   f.close();
 }
 
