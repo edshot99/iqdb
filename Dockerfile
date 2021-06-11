@@ -5,7 +5,9 @@ RUN \
   apt-get install --yes --no-install-recommends \
     ca-certificates build-essential cmake git python3 libgd-dev libsqlite3-dev
 COPY . ./
-RUN make
+RUN \
+  cmake -B build/release -DCMAKE_BUILD_TYPE=Release && \
+  cmake --build build/release -j $(nproc)
 
 FROM ubuntu:20.10
 WORKDIR /iqdb
