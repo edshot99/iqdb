@@ -116,9 +116,17 @@ void http_server(const std::string host, const int port, const std::string datab
     const auto matches = memory_db->queryFromBlob(file.content, limit);
 
     for (const auto &match : matches) {
+      auto image = memory_db->getImage(match.id);
+      auto haar = image->haar();
+
       data += {
-          {"id", match.id},
-          {"score", match.score},
+        { "id", match.id },
+        { "score", match.score },
+        { "hash", haar.to_string() },
+        { "signature", {
+          { "avglf", haar.avglf },
+          { "sig", haar.sig },
+        }}
       };
     }
 

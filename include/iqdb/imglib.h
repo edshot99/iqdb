@@ -122,6 +122,7 @@ public:
 
   // DB maintenance.
   virtual void addImage(imageId id, const HaarSignature& signature) override;
+  virtual std::optional<Image> getImage(imageId post_id) override;
   virtual void removeImage(imageId id) override;
   virtual void loadDatabase(std::string filename) override;
 

@@ -106,6 +106,10 @@ bool dbSpaceImpl::isDeleted(imageId iqdb_id) {
   return !m_info.at(iqdb_id).avgl.v[0];
 }
 
+std::optional<Image> dbSpaceImpl::getImage(imageId post_id) {
+  return sqlite_db_->getImage(post_id);
+}
+
 sim_vector dbSpace::queryFromBlob(const std::string blob, int numres) {
   HaarSignature signature = HaarSignature::from_file_content(blob);
   return queryFromSignature(signature, numres);

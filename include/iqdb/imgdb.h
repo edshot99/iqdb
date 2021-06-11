@@ -31,6 +31,7 @@
 #include <iqdb/haar.h>
 #include <iqdb/haar_signature.h>
 #include <iqdb/resizer.h>
+#include <iqdb/sqlite_db.h>
 
 namespace imgdb {
 
@@ -96,6 +97,7 @@ public:
 
   // DB maintenance.
   virtual void addImage(imageId id, const HaarSignature& signature) = 0;
+  virtual std::optional<Image> getImage(imageId post_id) = 0;
   virtual void removeImage(imageId id) = 0;
   virtual void loadDatabase(std::string filename) = 0;
 
