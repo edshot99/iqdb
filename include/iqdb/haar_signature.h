@@ -15,6 +15,7 @@ struct HaarSignature {
 
   HaarSignature() {};
   explicit HaarSignature(lumin_t avglf, signature_t sig);
+  static HaarSignature from_hash(const std::string hash);
   static HaarSignature from_file_content(const std::string blob);
 
   std::string to_string() const;

@@ -18,6 +18,29 @@ HaarSignature::HaarSignature(lumin_t avglf_, signature_t sig_) {
   std::sort(&sig[2][0], &sig[2][NUM_COEFS]);
 }
 
+HaarSignature HaarSignature::from_hash(const std::string hash) {
+  if (hash.size() != 5 + 2*sizeof(HaarSignature)) {
+    throw param_error("Invalid hash (hash=" + hash + ")");
+  }
+
+  HaarSignature haar;
+  const char* p = hash.c_str() + 5; // skip "iqdb_" prefix
+
+  for (double& avglf : haar.avglf) {
+    sscanf(p, "%16lx", reinterpret_cast<uint64_t*>(&avglf));
+    p += 2 * sizeof(uint64_t);
+  }
+
+  for (int c = 0; c < 3; c++) {
+    for (int16_t& coef : haar.sig[c]) {
+      sscanf(p, "%4hx", &coef);
+      p += 2 * sizeof(int16_t);
+    }
+  }
+
+  return haar;
+}
+
 HaarSignature HaarSignature::from_file_content(const std::string blob) {
   HaarSignature signature;
   std::vector<unsigned char> rchan(NUM_PIXELS * NUM_PIXELS);

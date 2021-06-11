@@ -104,16 +104,22 @@ void http_server(const std::string host, const int port, const std::string datab
     std::shared_lock lock(mutex_);
 
     int limit = 10;
+    sim_vector matches;
     json data;
-
-    if (!request.has_file("file"))
-      throw imgdb::param_error("`POST /query` requires a `file` param");
 
     if (request.has_param("limit"))
       limit = stoi(request.get_param_value("limit"));
 
-    const auto &file = request.get_file_value("file");
-    const auto matches = memory_db->queryFromBlob(file.content, limit);
+    if (request.has_param("hash")) {
+      const auto hash = request.get_param_value("hash");
+      HaarSignature haar = HaarSignature::from_hash(hash);
+      matches = memory_db->queryFromSignature(haar, limit);
+    } else if (request.has_file("file")) {
+      const auto &file = request.get_file_value("file");
+      matches = memory_db->queryFromBlob(file.content, limit);
+    } else {
+      throw param_error("`POST /query` requires a `file` or `hash` param");
+    }
 
     for (const auto &match : matches) {
       auto image = memory_db->getImage(match.id);
