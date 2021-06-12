@@ -40,7 +40,7 @@ typedef int16_t Idx;
 /* signature structure */
 typedef struct valStruct_ {
   Unit d;                                       /* [f]abs(a[i]) */
-  int i;                                        /* index i of a[i] */
+  Idx i;                                        /* index i of a[i] */
   bool operator<(const valStruct_ &right) const // warning: order is inverse so valqueue is ordered smallest->biggest
   {
     return d > right.d;

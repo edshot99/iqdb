@@ -48,7 +48,7 @@ RawImage resize_image_data(const unsigned char *data, size_t len, unsigned int t
   if (!thu)
     throw image_error("Out of memory.");
 
-  RawImage img(gdImageCreateFromJpegPtr(len, const_cast<unsigned char *>(data)), &gdImageDestroy);
+  RawImage img(gdImageCreateFromJpegPtr((int)len, const_cast<unsigned char *>(data)), &gdImageDestroy);
   if (!img)
     throw image_error("Could not read image.");
 

@@ -6,6 +6,7 @@
 #include <iqdb/debug.h>
 #include <iqdb/imglib.h>
 #include <iqdb/sqlite_db.h>
+#include <iqdb/types.h>
 
 namespace imgdb {
 
@@ -39,7 +40,7 @@ void SqliteDB::eachImage(std::function<void (const Image&)> func) {
   }
 }
 
-std::optional<Image> SqliteDB::getImage(int64_t post_id) {
+std::optional<Image> SqliteDB::getImage(postId post_id) {
   auto results = storage_.get_all<Image>(where(c(&Image::post_id) == post_id));
 
   if (results.size() == 1) {
@@ -50,7 +51,7 @@ std::optional<Image> SqliteDB::getImage(int64_t post_id) {
   }
 }
 
-int SqliteDB::addImage(int64_t post_id, HaarSignature signature) {
+int SqliteDB::addImage(postId post_id, HaarSignature signature) {
   int id = -1;
   auto sig_ptr = (const char*)signature.sig;
   std::vector<char> sig_blob(sig_ptr, sig_ptr + sizeof(signature.sig));
@@ -67,7 +68,7 @@ int SqliteDB::addImage(int64_t post_id, HaarSignature signature) {
   return id;
 }
 
-void SqliteDB::removeImage(int64_t post_id) {
+void SqliteDB::removeImage(postId post_id) {
   storage_.remove_all<Image>(where(c(&Image::post_id) == post_id));
 }
 

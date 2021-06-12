@@ -81,9 +81,9 @@ void dbSpaceImpl::addImageInMemory(imageId iqdb_id, imageId post_id, const HaarS
 
   image_info& info = m_info.at(iqdb_id);
   info.id = post_id;
-  info.avgl.v[0] = haar.avglf[0];
-  info.avgl.v[1] = haar.avglf[1];
-  info.avgl.v[2] = haar.avglf[2];
+  info.avgl.v[0] = static_cast<Score>(haar.avglf[0]);
+  info.avgl.v[1] = static_cast<Score>(haar.avglf[1]);
+  info.avgl.v[2] = static_cast<Score>(haar.avglf[2]);
 }
 
 void dbSpaceImpl::loadDatabase(std::string filename) {
@@ -129,7 +129,7 @@ sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_
     Score s = 0;
 
     for (int c = 0; c < signature.num_colors(); c++) {
-      s += weights[0][c] * std::abs(image_info.avgl.v[c] - signature.avglf[c]);
+      s += weights[0][c] * std::abs(image_info.avgl.v[c] - static_cast<Score>(signature.avglf[c]));
     }
 
     scores[i] = s;
@@ -154,7 +154,7 @@ sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_
   }
 
   // Fill up the numres-bounded priority queue (largest at top):
-  size_t i = 0;
+  iqdbId i = 0;
   for (; pqResults.size() < numres && i < scores.size(); i++) {
     if (!isDeleted(i))
       pqResults.emplace(i, scores[i]);
@@ -168,7 +168,7 @@ sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_
   }
 
   if (scale != 0)
-    scale = 1.0 / scale;
+    scale = static_cast<Score>(1.0) / scale;
 
   while (!pqResults.empty()) {
     auto value = pqResults.top();

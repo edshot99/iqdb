@@ -9,13 +9,14 @@
 
 #include <sqlite_orm/sqlite_orm.h>
 #include <iqdb/haar_signature.h>
+#include <iqdb/types.h>
 
 namespace imgdb {
 
 // A model representing an image signature stored in the SQLite database.
 struct Image {
-  int64_t id;            // The internal IQDB ID.
-  int64_t post_id;       // The external Danbooru post ID.
+  iqdbId id;             // The internal IQDB ID.
+  postId post_id;        // The external (Danbooru) post ID.
   double avglf1;         // The `double avglf[3]` array.
   double avglf2;
   double avglf3;
@@ -52,13 +53,13 @@ public:
   SqliteDB(const std::string& path = ":memory:") : storage_(initStorage(path)) {};
 
   // Get an image from the database, if it exists.
-  std::optional<Image> getImage(int64_t post_id);
+  std::optional<Image> getImage(postId post_id);
 
   // Add the image to the database. Replace the image if it already exists. Returns the internal IQDB id.
-  int addImage(int64_t post_id, HaarSignature signature);
+  int addImage(postId post_id, HaarSignature signature);
 
   // Remove the image from the database.
-  void removeImage(int64_t post_id);
+  void removeImage(postId post_id);
 
   // Call a function for each image in the database.
   void eachImage(std::function<void (const Image&)>);

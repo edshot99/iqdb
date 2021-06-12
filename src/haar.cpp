@@ -170,7 +170,8 @@ void transformChar(unsigned char *c1, unsigned char *c2, unsigned char *c3,
 // and store their indices in sig[].
 inline static void
 get_m_largests(Unit *cdata, Idx *sig) {
-  int cnt, i;
+  int cnt = 0;
+  Idx i = 0;
   valStruct val;
   std::priority_queue<valStruct> vq; // dynamic priority queue of valStruct's
 
@@ -198,16 +199,15 @@ get_m_largests(Unit *cdata, Idx *sig) {
   }
 
   // Empty the (non-empty) queue and fill-in sig:
-  cnt = 0;
-  do {
-    int t;
-
+  while (!vq.empty()) {
     val = vq.top();
-    t = (cdata[val.i] <= 0); /* t = 0 if pos else 1 */
-    /* i - 0 ^ 0 = i; i - 1 ^ 0b111..1111 = 2-compl(i) = -i */
-    sig[cnt++] = (val.i - t) ^ -t; // never 0
+
+    // The index is positive if the coefficient was positive; the index is
+    // negative if the coefficient was negative.
+    bool positive = cdata[val.i] > 0;
+    sig[cnt++] = positive ? val.i : (Idx)-val.i;
     vq.pop();
-  } while (!vq.empty());
+  }
   // Must have cnt==NUM_COEFS here.
 }
 

@@ -32,11 +32,9 @@
 #include <iqdb/haar_signature.h>
 #include <iqdb/resizer.h>
 #include <iqdb/sqlite_db.h>
+#include <iqdb/types.h>
 
 namespace imgdb {
-
-// Global typedefs and consts.
-typedef uint64_t imageId;
 
 // Exceptions.
 class base_error : public std::exception {
@@ -61,8 +59,6 @@ DEFINE_ERROR(simple_error, base_error)
 DEFINE_ERROR(param_error, simple_error) // An argument was invalid, e.g. non-existent image ID.
 DEFINE_ERROR(image_error, simple_error) // Could not successfully extract image data from the given file.
 
-typedef float Score;
-
 typedef struct {
   Score v[3];
 } lumin_native;
@@ -70,7 +66,7 @@ typedef struct {
 struct sim_value {
   imageId id;
   Score score;
-  sim_value(imageId id, Score score) : id(id), score(score) {};
+  sim_value(imageId id_, Score score_) : id(id_), score(score_) {};
   bool operator<(const sim_value &other) const { return score < other.score; }
 };
 

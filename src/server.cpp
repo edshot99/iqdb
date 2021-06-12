@@ -29,6 +29,7 @@
 #include <iqdb/imgdb.h>
 #include <iqdb/imglib.h>
 #include <iqdb/haar_signature.h>
+#include <iqdb/types.h>
 
 #include <httplib.h>
 #include <nlohmann/json.hpp>
@@ -90,7 +91,7 @@ void http_server(const std::string host, const int port, const std::string datab
   server.Delete("/images/(\\d+)", [&](const auto &request, auto &response) {
     std::unique_lock lock(mutex_);
 
-    const imgdb::imageId post_id = std::stoi(request.matches[1]);
+    const postId post_id = std::stoi(request.matches[1]);
     memory_db->removeImage(post_id);
 
     json data = {
@@ -142,7 +143,7 @@ void http_server(const std::string host, const int port, const std::string datab
   server.Get("/status", [&](const auto &request, auto &response) {
     std::shared_lock lock(mutex_);
 
-    const int count = memory_db->getImgCount();
+    const size_t count = memory_db->getImgCount();
     json data = {{"images", count}};
 
     response.set_content(data.dump(4), "application/json");

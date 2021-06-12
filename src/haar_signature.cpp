@@ -33,7 +33,7 @@ HaarSignature HaarSignature::from_hash(const std::string hash) {
 
   for (int c = 0; c < 3; c++) {
     for (int16_t& coef : haar.sig[c]) {
-      sscanf(p, "%4hx", &coef);
+      sscanf(p, "%4hx", reinterpret_cast<uint16_t*>(&coef));
       p += 2 * sizeof(int16_t);
     }
   }
@@ -54,9 +54,9 @@ HaarSignature HaarSignature::from_file_content(const std::string blob) {
       // https://libgd.github.io/manuals/2.3.1/files/gd-c.html#gdImageGetPixel
       // https://libgd.github.io/manuals/2.3.1/files/gd-h.html#gdTrueColorGetRed
       int pixel = gdImageGetPixel(image.get(), x, y);
-      rchan[x + y * NUM_PIXELS] = gdTrueColorGetRed(pixel);
-      gchan[x + y * NUM_PIXELS] = gdTrueColorGetGreen(pixel);
-      bchan[x + y * NUM_PIXELS] = gdTrueColorGetBlue(pixel);
+      rchan[x + y * NUM_PIXELS] = static_cast<unsigned char>(gdTrueColorGetRed(pixel));
+      gchan[x + y * NUM_PIXELS] = static_cast<unsigned char>(gdTrueColorGetGreen(pixel));
+      bchan[x + y * NUM_PIXELS] = static_cast<unsigned char>(gdTrueColorGetBlue(pixel));
     }
   }
 

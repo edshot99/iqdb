@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
       help();
 
     if (!strncmp(argv[1], "-d=", 3)) {
-      debug_level = strtol(argv[1] + 3, NULL, 0);
+      debug_level = std::stoi(argv[1] + 3, NULL, 0);
       INFO("Debug level set to {}\n", debug_level);
       argv++;
       argc--;

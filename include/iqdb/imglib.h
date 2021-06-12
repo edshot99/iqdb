@@ -53,7 +53,7 @@ namespace imgdb {
 
 // Weights for the Haar coefficients.
 // Straight from the referenced paper:
-const float weights[6][3] =
+const Score weights[6][3] =
     // For scanned picture (sketch=0):
     //    Y      I      Q       idx total occurs
     {{5.00f, 19.21f, 34.37f}, // 0   58.58      1 (`DC' component)
