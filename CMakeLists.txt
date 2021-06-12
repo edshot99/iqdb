@@ -2,13 +2,6 @@ cmake_minimum_required(VERSION 3.14)
 
 project(iqdb)
 
-# https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
-# https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
-# https://funroll-loops.oya.to/
-set(CMAKE_CXX_FLAGS_DEBUG "-Og -g3 -Wall -Wextra -Wno-unused-parameter -pedantic")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -flto -march=x86-64 -DNDEBUG")
-#set(CMAKE_CXX_FLAGS_RELEASE "-O3 -flto -march=x86-64-v2 -DNDEBUG")
-
 # Require C++17
 # https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html
 # https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD_REQUIRED.html
