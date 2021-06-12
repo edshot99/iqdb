@@ -13,6 +13,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # https://gcc.gnu.org/onlinedocs/gcc/C_002b_002b-Extensions.html
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html
+# https://clang.llvm.org/docs/JSONCompilationDatabase.html#supported-systems
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # https://stackoverflow.com/questions/1620918/cmake-and-libpthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
