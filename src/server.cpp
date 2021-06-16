@@ -71,13 +71,13 @@ void http_server(const std::string host, const int port, const std::string datab
     if (!request.has_file("file"))
       throw imgdb::param_error("`POST /images/:id` requires a `file` param");
 
-    const imageId post_id = std::stoi(request.matches[1]);
+    const postId post_id = std::stoi(request.matches[1]);
     const auto &file = request.get_file_value("file");
     const auto signature = HaarSignature::from_file_content(file.content);
     memory_db->addImage(post_id, signature);
 
     json data = {
-      { "id", post_id },
+      { "post_id", post_id },
       { "hash", signature.to_string() },
       { "signature", {
         { "avglf", signature.avglf },
@@ -95,7 +95,7 @@ void http_server(const std::string host, const int port, const std::string datab
     memory_db->removeImage(post_id);
 
     json data = {
-      { "id", post_id },
+      { "post_id", post_id },
     };
 
     response.set_content(data.dump(4), "application/json");
@@ -127,7 +127,7 @@ void http_server(const std::string host, const int port, const std::string datab
       auto haar = image->haar();
 
       data += {
-        { "id", match.id },
+        { "post_id", match.id },
         { "score", match.score },
         { "hash", haar.to_string() },
         { "signature", {
