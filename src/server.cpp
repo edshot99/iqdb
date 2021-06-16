@@ -106,7 +106,7 @@ void http_server(const std::string host, const int port, const std::string datab
 
     int limit = 10;
     sim_vector matches;
-    json data;
+    json data = json::array();
 
     if (request.has_param("limit"))
       limit = stoi(request.get_param_value("limit"));
