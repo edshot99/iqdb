@@ -1,3 +1,5 @@
+[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/from-referrer/)
+
 iqdb - Image Query Database system
 piespy@gmail.com
 
@@ -238,3 +240,11 @@ this isn't the number you expect, the conversion probably didn't work. In
 that case you will have to rebuild the database from scratch using the
 new version.
 
+wget https://github.com/yhirose/cpp-httplib/blob/77a77f6d2df8d648cfd481345c000acf211f05b5/httplib.h
+
+sudo apt-get install g++-10 libstdc++6-10-dbg
+LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/debug/ gdb --args ./build/debug/iqdb http localhost 9001 blah.db
+
+https://cliutils.gitlab.io/modern-cmake/chapters/basics/structure.html
+https://cliutils.gitlab.io/modern-cmake/
+https://riptutorial.com/cmake
