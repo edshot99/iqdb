@@ -26,7 +26,7 @@
 #include <iqdb/server.h>
 #include <iqdb/sqlite_db.h>
 
-using namespace imgdb;
+using namespace iqdb;
 
 int main(int argc, char **argv) {
   try {
@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
     } else {
       help();
     }
-  } catch (const imgdb::base_error &err) {
+  } catch (const iqdb::base_error &err) {
     INFO("Error: {}.\n", err.what());
     if (errno)
       perror("Last system error");

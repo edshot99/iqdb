@@ -27,6 +27,8 @@
 #include <queue>
 #include <cinttypes>
 
+namespace iqdb {
+
 /* Number of pixels on one side of image; required to be a power of 2. */
 #define NUM_PIXELS 128
 /* Totals pixels in a square image. */
@@ -50,5 +52,7 @@ typedef struct valStruct_ {
 void transform(Unit *a, Unit *b, Unit *c);
 void transformChar(unsigned char *c1, unsigned char *c2, unsigned char *c3, Unit *a, Unit *b, Unit *c);
 int calcHaar(Unit *cdata1, Unit *cdata2, Unit *cdata3, Idx *sig1, Idx *sig2, Idx *sig3, double *avgl);
+
+}
 
 #endif

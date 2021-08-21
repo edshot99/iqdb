@@ -33,7 +33,7 @@
 #include <iqdb/haar_signature.h>
 #include <iqdb/sqlite_db.h>
 
-namespace imgdb {
+namespace iqdb {
 
 void bucket_set::add(const HaarSignature &sig, imageId iqdb_id) {
   eachBucket(sig, [&](auto& bucket) {
@@ -265,4 +265,4 @@ dbSpaceImpl::dbSpaceImpl(std::string filename) : sqlite_db_(nullptr) {
 dbSpaceImpl::~dbSpaceImpl() {
 }
 
-} // namespace imgdb
+}

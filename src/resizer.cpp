@@ -26,7 +26,7 @@
 #include <iqdb/imgdb.h>
 #include <iqdb/resizer.h>
 
-namespace imgdb {
+namespace iqdb {
 
 enum image_types { IMG_UNKNOWN, IMG_JPEG };
 

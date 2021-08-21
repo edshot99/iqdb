@@ -8,7 +8,7 @@
 #include <iqdb/sqlite_db.h>
 #include <iqdb/types.h>
 
-namespace imgdb {
+namespace iqdb {
 
 using namespace sqlite_orm;
 

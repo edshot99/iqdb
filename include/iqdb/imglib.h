@@ -49,7 +49,7 @@ different but the majority of the actual code is the same for both types.
 #include <iqdb/imgdb.h>
 #include <iqdb/sqlite_db.h>
 
-namespace imgdb {
+namespace iqdb {
 
 // Weights for the Haar coefficients.
 // Straight from the referenced paper:
@@ -134,6 +134,6 @@ private:
   bucket_set imgbuckets;
 };
 
-} // namespace imgdb
+}
 
 #endif

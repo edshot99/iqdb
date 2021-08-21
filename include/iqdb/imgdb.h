@@ -34,7 +34,7 @@
 #include <iqdb/sqlite_db.h>
 #include <iqdb/types.h>
 
-namespace imgdb {
+namespace iqdb {
 
 // Exceptions.
 class base_error : public std::exception {
@@ -104,6 +104,6 @@ private:
   void operator=(const dbSpace &);
 };
 
-} // namespace imgdb
+}
 
 #endif

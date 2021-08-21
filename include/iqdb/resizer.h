@@ -25,7 +25,7 @@
 #include <gd.h>
 #include <memory>
 
-namespace imgdb {
+namespace iqdb {
 
 typedef std::unique_ptr<gdImage, decltype(&gdImageDestroy)> RawImage;
 

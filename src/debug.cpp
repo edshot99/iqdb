@@ -3,6 +3,8 @@
 
 #include <iqdb/debug.h>
 
+namespace iqdb {
+
 int debug_level = 0; // Debug
 
 thread_local std::string last_exception_backtrace;
@@ -49,4 +51,6 @@ std::string demangle_name(std::string symbol_name) {
   } else {
     throw std::runtime_error("__cxa_demangle failed");
   }
+}
+
 }

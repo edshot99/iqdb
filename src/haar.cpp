@@ -54,6 +54,8 @@
 /* imgSeek Includes */
 #include <iqdb/haar.h>
 
+namespace iqdb {
+
 // RGB -> YIQ colorspace conversion; Y luminance, I,Q chrominance.
 // If RGB in [0..255] then Y in [0..255] and I,Q in [-127..127].
 #define RGB_2_YIQ(a, b, c)                            \
@@ -232,4 +234,6 @@ int calcHaar(Unit *cdata1, Unit *cdata2, Unit *cdata3,
   get_m_largests(cdata3, sig3);
 
   return 1;
+}
+
 }

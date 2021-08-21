@@ -3,6 +3,8 @@
 
 #include <fmt/format.h>
 
+namespace iqdb {
+
 // The logging verbosity level. 0 = DEBUG, 1 = ERROR, 2 = WARN, 3 = INFO.
 extern int debug_level;
 
@@ -41,6 +43,8 @@ inline void WARN(std::string format, Args... args) {
 template<typename... Args>
 inline void INFO(std::string format, Args... args) {
   LOG("[info] " + format, 3, args...);
+}
+
 }
 
 #endif // IQDB_DEBUG_H

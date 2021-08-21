@@ -37,9 +37,9 @@
 
 using nlohmann::json;
 using httplib::Server;
-using imgdb::dbSpace;
+using iqdb::dbSpace;
 
-namespace imgdb {
+namespace iqdb {
 
 static Server server;
 
@@ -81,7 +81,7 @@ void http_server(const std::string host, const int port, const std::string datab
     std::unique_lock lock(mutex_);
 
     if (!request.has_file("file"))
-      throw imgdb::param_error("`POST /images/:id` requires a `file` param");
+      throw iqdb::param_error("`POST /images/:id` requires a `file` param");
 
     const postId post_id = std::stoi(request.matches[1]);
     const auto &file = request.get_file_value("file");

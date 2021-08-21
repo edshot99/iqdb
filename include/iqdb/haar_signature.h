@@ -4,7 +4,7 @@
 #include <string>
 #include <iqdb/haar.h>
 
-namespace imgdb {
+namespace iqdb {
 
 using lumin_t = double[3];
 using signature_t = int16_t[3][NUM_COEFS];

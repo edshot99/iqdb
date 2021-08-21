@@ -11,7 +11,7 @@
 #include <iqdb/haar_signature.h>
 #include <iqdb/types.h>
 
-namespace imgdb {
+namespace iqdb {
 
 // A model representing an image signature stored in the SQLite database.
 struct Image {

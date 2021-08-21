@@ -7,7 +7,7 @@
 #include <iqdb/imgdb.h>
 #include <iqdb/resizer.h>
 
-namespace imgdb {
+namespace iqdb {
 
 HaarSignature::HaarSignature(lumin_t avglf_, signature_t sig_) {
   std::copy(avglf_, avglf_+ 3, avglf);
