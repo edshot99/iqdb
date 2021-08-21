@@ -64,9 +64,6 @@ public:
   // Call a function for each image in the database.
   void eachImage(std::function<void (const Image&)>);
 
-  // Convert a database from the old IQDB format to the new SQLite format.
-  static void convertDatabase(std::string input_filename, std::string output_filename);
-
 private:
   // The SQLite database.
   Storage storage_;

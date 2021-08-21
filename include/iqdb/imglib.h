@@ -134,18 +134,6 @@ private:
   bucket_set imgbuckets;
 };
 
-// Serialization constants
-static const unsigned int SRZ_V0_9_0 = 9;
-
-// Variable size and endianness check
-static const uint32_t SRZ_V_SZ = (sizeof(uint64_t)) |
-                                 (sizeof(uint64_t) << 5) |
-                                 (sizeof(uint64_t) << 10) |
-                                 (sizeof(uint64_t) << 15) |
-                                 (3 << 20); // never matches any of the above for endian check
-
-static const uint32_t SRZ_V_CODE = (SRZ_V0_9_0) | (SRZ_V_SZ << 8);
-
 } // namespace imgdb
 
 #endif
