@@ -20,6 +20,7 @@
 
 #include <csignal>
 #include <cstddef>
+#include <cstring>
 #include <string>
 #include <memory>
 #include <mutex>
@@ -42,19 +43,30 @@ namespace imgdb {
 
 static Server server;
 
+static void signal_handler(int signal, siginfo_t* info, void* ucontext) {
+  INFO("Received signal {} ({})\n", signal, strsignal(signal));
+
+  if (signal == SIGSEGV) {
+    INFO("Address: {}\n", info->si_addr);
+    DEBUG("{}", get_backtrace(2));
+    exit(1);
+  }
+
+  if (server.is_running()) {
+    server.stop();
+  }
+}
+
 void install_signal_handlers() {
   struct sigaction action = {};
   sigfillset(&action.sa_mask);
-  action.sa_flags = SA_RESTART;
+  action.sa_flags = SA_RESTART | SA_SIGINFO;
 
-  action.sa_handler = [](int) {
-    if (server.is_running()) {
-      server.stop();
-    }
-  };
+  action.sa_sigaction = signal_handler;
 
   sigaction(SIGINT, &action, NULL);
   sigaction(SIGTERM, &action, NULL);
+  sigaction(SIGSEGV, &action, NULL);
 }
 
 void http_server(const std::string host, const int port, const std::string database_filename) {
@@ -154,7 +166,16 @@ void http_server(const std::string host, const int port, const std::string datab
   });
 
   server.set_exception_handler([](const auto& req, auto& res, std::exception &e) {
-    json data = { { "message", e.what() } };
+    const auto name = demangle_name(typeid(e).name());
+    const auto message = e.what();
+
+    json data = {
+      { "exception", name },
+      { "message", message },
+      { "backtrace", last_exception_backtrace }
+    };
+
+    DEBUG("Exception: {} ({})\n{}\n", name, message, last_exception_backtrace);
 
     res.set_content(data.dump(4), "application/json");
     res.status = 500;

@@ -1,6 +1,10 @@
 file(GLOB iqdb_SRC CONFIGURE_DEPENDS "*.h" "*.cpp")
 add_executable(iqdb ${iqdb_SRC})
 
+# Add backward-cpp (for backtraces)
+# https://github.com/bombela/backward-cpp#as-a-subdirectory
+add_backward(iqdb)
+
 target_link_libraries(
   iqdb PRIVATE
   Threads::Threads
@@ -8,6 +12,7 @@ target_link_libraries(
   httplib::httplib
   fmt::fmt
   sqlite_orm::sqlite_orm
+  ${CMAKE_DL_LIBS} # libdl (for dlsym)
   ${GDLIB_LIBRARIES}
 )
 
@@ -70,7 +75,7 @@ set(IQDB_RELEASE_CFLAGS
   # https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
   # https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
   # https://funroll-loops.oya.to/
-  -Wall -O3 -pipe -DNDEBUG -flto -fno-strict-aliasing -march=x86-64
+  -Wall -O3 -g3 -pipe -DNDEBUG -flto -fno-strict-aliasing -march=x86-64
 )
 
 target_compile_options(iqdb PRIVATE $<$<CONFIG:DEBUG>:${IQDB_DEBUG_CFLAGS}>)
