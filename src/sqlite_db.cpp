@@ -24,6 +24,7 @@ void SqliteDB::eachImage(std::function<void (const Image&)> func) {
 }
 
 std::optional<Image> SqliteDB::getImage(postId post_id) {
+  std::unique_lock lock(sql_mutex_);
   auto results = storage_.get_all<Image>(where(c(&Image::post_id) == post_id));
 
   if (results.size() == 1) {

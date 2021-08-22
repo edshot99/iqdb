@@ -3,7 +3,9 @@
 
 #include <cstdint>
 #include <functional>
+#include <mutex>
 #include <optional>
+#include <shared_mutex>
 #include <string>
 #include <vector>
 
@@ -67,6 +69,9 @@ public:
 private:
   // The SQLite database.
   Storage storage_;
+
+  // A mutex around the database
+  std::shared_mutex sql_mutex_;
 };
 
 }
