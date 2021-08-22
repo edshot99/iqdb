@@ -197,60 +197,6 @@ void dbSpaceImpl::removeImage(imageId post_id) {
   DEBUG("Removed post #{} from memory and database.\n", post_id);
 }
 
-/*
-Score dbSpaceCommon::calcAvglDiff(imageId id1, imageId id2) {
-  // return the average luminance difference
-
-  // are images on db ?
-  lumin_native avgl1, avgl2;
-  getImgAvgl(id1, avgl1);
-  getImgAvgl(id2, avgl2);
-  return std::abs(avgl1.v[0] - avgl2.v[0]) + std::abs(avgl1.v[1] - avgl2.v[1]) + std::abs(avgl1.v[2] - avgl2.v[2]);
-}
-
-Score dbSpaceCommon::calcSim(imageId id1, imageId id2, bool ignore_color) {
-  // use it to tell the content-based difference between two images
-  ImgData dsig1, dsig2;
-  getImgDataByID(id1, &dsig1);
-  getImgDataByID(id2, &dsig2);
-
-  Idx *const sig1[3] = {dsig1.sig1, dsig1.sig2, dsig1.sig3};
-  Idx *const sig2[3] = {dsig2.sig1, dsig2.sig2, dsig2.sig3};
-
-  Score score = 0, scale = 0;
-  lumin_native avgl1, avgl2;
-  image_info::avglf2i(dsig1.avglf, avgl1);
-  image_info::avglf2i(dsig2.avglf, avgl2);
-
-  int cnum = ignore_color || is_grayscale(avgl1) || is_grayscale(avgl2) ? 1 : 3;
-
-  for (int c = 0; c < cnum; c++)
-    score += DScSc(2 * ((DScore)weights[0][c]) * std::abs(avgl1.v[c] - avgl2.v[c]));
-
-  for (int c = 0; c < cnum; c++) {
-    std::sort(sig1[c] + 0, sig1[c] + NUM_COEFS);
-    std::sort(sig2[c] + 0, sig2[c] + NUM_COEFS);
-
-    for (int b1 = 0, b2 = 0; b1 < NUM_COEFS || b2 < NUM_COEFS;) {
-      int ind1 = b1 == NUM_COEFS ? std::numeric_limits<int>::max() : sig1[c][b1];
-      int ind2 = b2 == NUM_COEFS ? std::numeric_limits<int>::max() : sig2[c][b2];
-
-      Score weight = weights[imgBin[std::abs(ind1 < ind2 ? ind1 : ind2)]][c];
-      scale -= weight;
-
-      if (ind1 == ind2)
-        score -= weight;
-
-      b1 += ind1 <= ind2;
-      b2 += ind2 <= ind1;
-    }
-  }
-
-  scale = ((DScore)MakeScore(1)) * MakeScore(1) / scale;
-  return DScSc(((DScore)score) * 100 * scale);
-}
-*/
-
 size_t dbSpaceImpl::getImgCount() {
   return m_info.size();
 }
