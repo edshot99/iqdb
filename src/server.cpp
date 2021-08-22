@@ -37,7 +37,7 @@
 
 using nlohmann::json;
 using httplib::Server;
-using iqdb::dbSpace;
+using iqdb::IQDB;
 
 namespace iqdb {
 
@@ -73,7 +73,7 @@ void http_server(const std::string host, const int port, const std::string datab
   INFO("Starting server...\n");
 
   std::shared_mutex mutex_;
-  auto memory_db = std::make_unique<dbSpaceImpl>(database_filename);
+  auto memory_db = std::make_unique<IQDB>(database_filename);
 
   install_signal_handlers();
 

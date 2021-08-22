@@ -21,32 +21,10 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 \**************************************************************************/
 
-/**************************************************************************\
-Implementation notes:
-
-The abstract dbSpace class is implemented as two different dbSpaceImpl
-classes depending on a bool template parameter indicating whether the DB is
-read-only or not. The "false" version has full functionality but is not
-optimized for querying. The "true" version is read-only but has much faster
-queries. The read-only version can optionally discard image data not needed
-for querying from external image files to further reduce memory usage. This
-is called "simple mode".
-
-There is an additional "alter" version that modifies the DB file directly
-instead of first loading it into memory, like the other modes do.
-
-The advantage of this design is maximum code re-use for the two DB usage
-patterns: maintenance and querying. Both implementation classes use
-different variables, and specifically different iterators to iterate over
-all images. The implementation details of the iterators are of course
-different but the majority of the actual code is the same for both types.
-\**************************************************************************/
-
 #ifndef IMGDBLIB_H
 #define IMGDBLIB_H
 
 #include <iqdb/haar.h>
-#include <iqdb/imgdb.h>
 #include <iqdb/sqlite_db.h>
 
 namespace iqdb {
@@ -105,33 +83,6 @@ private:
 
   // 3 * 2 * 16384 = 98304 total buckets
   bucket_t buckets[n_colors][n_signs][n_indexes];
-};
-
-// Specific implementations.
-class dbSpaceImpl : public dbSpace {
-public:
-  dbSpaceImpl(std::string filename = ":memory:");
-  virtual ~dbSpaceImpl();
-
-  // Image queries.
-  virtual sim_vector queryFromSignature(const HaarSignature& sig, size_t numres = 10) override;
-
-  // Stats.
-  virtual size_t getImgCount() override;
-  bool isDeleted(imageId id); // XXX id is the iqdb id
-
-  // DB maintenance.
-  virtual void addImage(imageId id, const HaarSignature& signature) override;
-  virtual std::optional<Image> getImage(imageId post_id) override;
-  virtual void removeImage(imageId id) override;
-  virtual void loadDatabase(std::string filename) override;
-
-private:
-  void addImageInMemory(imageId iqdb_id, imageId post_id, const HaarSignature& signature);
-
-  std::vector<image_info> m_info;
-  std::unique_ptr<SqliteDB> sqlite_db_;
-  bucket_set imgbuckets;
 };
 
 }

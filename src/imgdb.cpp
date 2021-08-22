@@ -63,7 +63,7 @@ void bucket_set::eachBucket(const HaarSignature &sig, std::function<void(bucket_
   }
 }
 
-void dbSpaceImpl::addImage(imageId post_id, const HaarSignature& haar) {
+void IQDB::addImage(imageId post_id, const HaarSignature& haar) {
   removeImage(post_id);
   int iqdb_id = sqlite_db_->addImage(post_id, haar);
   addImageInMemory(iqdb_id, post_id, haar);
@@ -71,7 +71,7 @@ void dbSpaceImpl::addImage(imageId post_id, const HaarSignature& haar) {
   DEBUG("Added post #{} to memory and database (iqdb={} haar={}).\n", post_id, iqdb_id, haar.to_string());
 }
 
-void dbSpaceImpl::addImageInMemory(imageId iqdb_id, imageId post_id, const HaarSignature& haar) {
+void IQDB::addImageInMemory(imageId iqdb_id, imageId post_id, const HaarSignature& haar) {
   if ((size_t)iqdb_id >= m_info.size()) {
     DEBUG("Growing m_info array (size={}).\n", m_info.size());
     m_info.resize(iqdb_id + 50000);
@@ -86,7 +86,7 @@ void dbSpaceImpl::addImageInMemory(imageId iqdb_id, imageId post_id, const HaarS
   info.avgl.v[2] = static_cast<Score>(haar.avglf[2]);
 }
 
-void dbSpaceImpl::loadDatabase(std::string filename) {
+void IQDB::loadDatabase(std::string filename) {
   sqlite_db_ = std::make_unique<SqliteDB>(filename);
   m_info.clear();
   imgbuckets = bucket_set();
@@ -102,20 +102,20 @@ void dbSpaceImpl::loadDatabase(std::string filename) {
   INFO("Loaded {} images from {}.\n", getImgCount(), filename);
 }
 
-bool dbSpaceImpl::isDeleted(imageId iqdb_id) {
+bool IQDB::isDeleted(imageId iqdb_id) {
   return !m_info.at(iqdb_id).avgl.v[0];
 }
 
-std::optional<Image> dbSpaceImpl::getImage(imageId post_id) {
+std::optional<Image> IQDB::getImage(imageId post_id) {
   return sqlite_db_->getImage(post_id);
 }
 
-sim_vector dbSpace::queryFromBlob(const std::string blob, int numres) {
+sim_vector IQDB::queryFromBlob(const std::string blob, int numres) {
   HaarSignature signature = HaarSignature::from_file_content(blob);
   return queryFromSignature(signature, numres);
 }
 
-sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_t numres) {
+sim_vector IQDB::queryFromSignature(const HaarSignature &signature, size_t numres) {
   Score scale = 0;
   std::vector<Score> scores(m_info.size(), 0);
   std::priority_queue<sim_value> pqResults; /* results priority queue; largest at top */
@@ -183,7 +183,7 @@ sim_vector dbSpaceImpl::queryFromSignature(const HaarSignature &signature, size_
   return V;
 }
 
-void dbSpaceImpl::removeImage(imageId post_id) {
+void IQDB::removeImage(imageId post_id) {
   auto image = sqlite_db_->getImage(post_id);
   if (image == std::nullopt) {
     WARN("Couldn't remove post #{}; post not in sqlite database.\n", post_id);
@@ -197,18 +197,12 @@ void dbSpaceImpl::removeImage(imageId post_id) {
   DEBUG("Removed post #{} from memory and database.\n", post_id);
 }
 
-size_t dbSpaceImpl::getImgCount() {
+size_t IQDB::getImgCount() {
   return m_info.size();
 }
 
-dbSpace::dbSpace() {}
-dbSpace::~dbSpace() {}
-
-dbSpaceImpl::dbSpaceImpl(std::string filename) : sqlite_db_(nullptr) {
+IQDB::IQDB(std::string filename) : sqlite_db_(nullptr) {
   loadDatabase(filename);
-}
-
-dbSpaceImpl::~dbSpaceImpl() {
 }
 
 }

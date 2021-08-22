@@ -30,6 +30,7 @@
 
 #include <iqdb/haar.h>
 #include <iqdb/haar_signature.h>
+#include <iqdb/imglib.h>
 #include <iqdb/resizer.h>
 #include <iqdb/sqlite_db.h>
 #include <iqdb/types.h>
@@ -80,28 +81,33 @@ struct image_info {
 typedef std::vector<sim_value> sim_vector;
 typedef Idx sig_t[NUM_COEFS];
 
-class dbSpace {
+class IQDB {
 public:
-  virtual ~dbSpace();
+  IQDB(std::string filename = ":memory:");
 
   // Image queries.
-  virtual sim_vector queryFromSignature(const HaarSignature& img, size_t numres = 10) = 0;
-  virtual sim_vector queryFromBlob(const std::string blob, int numres = 10);
+  sim_vector queryFromSignature(const HaarSignature& img, size_t numres = 10);
+  sim_vector queryFromBlob(const std::string blob, int numres = 10);
 
   // Stats.
-  virtual size_t getImgCount() = 0;
+  size_t getImgCount();
+  bool isDeleted(imageId id); // XXX id is the iqdb id
 
   // DB maintenance.
-  virtual void addImage(imageId id, const HaarSignature& signature) = 0;
-  virtual std::optional<Image> getImage(imageId post_id) = 0;
-  virtual void removeImage(imageId id) = 0;
-  virtual void loadDatabase(std::string filename) = 0;
-
-protected:
-  dbSpace();
+  void addImage(imageId id, const HaarSignature& signature);
+  std::optional<Image> getImage(imageId post_id);
+  void removeImage(imageId id);
+  void loadDatabase(std::string filename);
 
 private:
-  void operator=(const dbSpace &);
+  void addImageInMemory(imageId iqdb_id, imageId post_id, const HaarSignature& signature);
+
+  std::vector<image_info> m_info;
+  std::unique_ptr<SqliteDB> sqlite_db_;
+  bucket_set imgbuckets;
+
+private:
+  void operator=(const IQDB &);
 };
 
 }
