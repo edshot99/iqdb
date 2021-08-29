@@ -1,3 +1,12 @@
+iqdb-20210618:
+- Total rewrite (@evazion)
+- Added JSON-based HTTP API
+- Added multithreaded HTTP server
+- Added ability to search by hash
+- Made adding an image update the on-disk database too
+- Replaced custom database format with SQLite database
+- Refactored and simplified most old code
+
 iqdb-20161008:
 - C++11 compatibility (and remove old GNU extensions)
 - update for recent libpng API
