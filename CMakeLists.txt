@@ -61,18 +61,11 @@ FetchContent_Declare(
   GIT_TAG        1.6
 )
 
-FetchContent_Declare(
-  backwardcpp
-  GIT_REPOSITORY https://github.com/bombela/backward-cpp
-  GIT_TAG        v1.6
-)
-
 FetchContent_MakeAvailable(httplib)
 FetchContent_MakeAvailable(json)
 FetchContent_MakeAvailable(Catch2)
 FetchContent_MakeAvailable(fmt)
 FetchContent_MakeAvailable(sqliteOrm)
-FetchContent_MakeAvailable(backwardcpp)
 
 find_package(SQLite3 REQUIRED)
 find_package(Threads REQUIRED)

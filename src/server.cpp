@@ -48,7 +48,6 @@ static void signal_handler(int signal, siginfo_t* info, void* ucontext) {
 
   if (signal == SIGSEGV) {
     INFO("Address: {}\n", info->si_addr);
-    DEBUG("{}", get_backtrace(2));
     exit(1);
   }
 
@@ -166,16 +165,13 @@ void http_server(const std::string host, const int port, const std::string datab
   });
 
   server.set_exception_handler([](const auto& req, auto& res, std::exception &e) {
-    const auto name = demangle_name(typeid(e).name());
     const auto message = e.what();
 
     json data = {
-      { "exception", name },
-      { "message", message },
-      { "backtrace", last_exception_backtrace }
+      { "message", message }
     };
 
-    DEBUG("Exception: {} ({})\n{}\n", name, message, last_exception_backtrace);
+    DEBUG("Exception: {}\n", message);
 
     res.set_content(data.dump(4), "application/json");
     res.status = 500;

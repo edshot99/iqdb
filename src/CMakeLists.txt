@@ -1,10 +1,6 @@
 file(GLOB iqdb_SRC CONFIGURE_DEPENDS "*.h" "*.cpp")
 add_executable(iqdb ${iqdb_SRC})
 
-# Add backward-cpp (for backtraces)
-# https://github.com/bombela/backward-cpp#as-a-subdirectory
-add_backward(iqdb)
-
 target_link_libraries(
   iqdb PRIVATE
   Threads::Threads
