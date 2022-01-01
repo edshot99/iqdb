@@ -67,7 +67,7 @@ void IQDB::addImage(imageId post_id, const HaarSignature& haar) {
   removeImage(post_id);
   int iqdb_id = sqlite_db_->addImage(post_id, haar);
   addImageInMemory(iqdb_id, post_id, haar);
-
+  img_count++;
   DEBUG("Added post #{} to memory and database (iqdb={} haar={}).\n", post_id, iqdb_id, haar.to_string());
 }
 
@@ -93,8 +93,9 @@ void IQDB::loadDatabase(std::string filename) {
 
   sqlite_db_->eachImage([&](const auto& image) {
     addImageInMemory(image.id, image.post_id, image.haar());
+    img_count++;
 
-    if (image.id % 250000 == 0) {
+    if (img_count % 250000 == 0) {
       INFO("Loaded image {} (post #{})...\n", image.id, image.post_id);
     }
   });
@@ -198,7 +199,7 @@ void IQDB::removeImage(imageId post_id) {
 }
 
 size_t IQDB::getImgCount() {
-  return m_info.size();
+  return img_count;
 }
 
 IQDB::IQDB(std::string filename) : sqlite_db_(nullptr) {
