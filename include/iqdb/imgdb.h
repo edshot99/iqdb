@@ -31,7 +31,6 @@
 #include <iqdb/haar.h>
 #include <iqdb/haar_signature.h>
 #include <iqdb/imglib.h>
-#include <iqdb/resizer.h>
 #include <iqdb/sqlite_db.h>
 #include <iqdb/types.h>
 
@@ -87,7 +86,7 @@ public:
 
   // Image queries.
   sim_vector queryFromSignature(const HaarSignature& img, size_t numres = 10);
-  sim_vector queryFromBlob(const std::string blob, int numres = 10);
+  sim_vector queryFromChannels(const std::vector<unsigned char> rchan, const std::vector<unsigned char> gchan, const std::vector<unsigned char> bchan, int numres = 10);
 
   // Stats.
   size_t getImgCount();

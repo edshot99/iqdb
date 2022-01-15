@@ -111,8 +111,8 @@ std::optional<Image> IQDB::getImage(imageId post_id) {
   return sqlite_db_->getImage(post_id);
 }
 
-sim_vector IQDB::queryFromBlob(const std::string blob, int numres) {
-  HaarSignature signature = HaarSignature::from_file_content(blob);
+sim_vector IQDB::queryFromChannels(std::vector<unsigned char> rchan, std::vector<unsigned char> gchan, std::vector<unsigned char> bchan, int numres) {
+  HaarSignature signature = HaarSignature::from_channels(rchan, gchan, bchan);
   return queryFromSignature(signature, numres);
 }
 

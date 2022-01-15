@@ -68,6 +68,20 @@ void install_signal_handlers() {
   sigaction(SIGSEGV, &action, NULL);
 }
 
+bool check_is_valid(nlohmann::json json) {
+  if(json.is_array() && json.size() == NUM_PIXELS_SQUARED) {
+    return std::all_of(json.begin(), json.end(), [](const nlohmann::json& el){ return el.is_number_integer(); });
+  }
+  return false;
+}
+
+bool channel_param_valid(nlohmann::json json) {
+  if(json.is_object() && json.contains("r") && json.contains("g") && json.contains("b")) {
+    return check_is_valid(json["r"]) && check_is_valid(json["g"]) && check_is_valid(json["b"]);
+  }
+  return false;
+}
+
 void http_server(const std::string host, const int port, const std::string database_filename) {
   INFO("Starting server...\n");
 
@@ -79,15 +93,16 @@ void http_server(const std::string host, const int port, const std::string datab
   server.Post("/images/(\\d+)", [&](const auto &request, auto &response) {
     std::unique_lock lock(mutex_);
 
-    if (!request.has_file("file"))
-      throw iqdb::param_error("`POST /images/:id` requires a `file` param");
-
     const postId post_id = std::stoi(request.matches[1]);
-    const auto &file = request.get_file_value("file");
-    const auto signature = HaarSignature::from_file_content(file.content);
+    const auto json = json::parse(request.body);
+    if(!json.is_object() || !json.contains("channels") || !channel_param_valid(json["channels"])) {
+      throw param_error("`POST /images` must be { 'channels': { 'r': [], 'g': [], 'b': [] }} 128^2 entries each");
+    }
+    const auto channels = json["channels"];
+    const auto signature = HaarSignature::from_channels(channels["r"], channels["g"], channels["b"]);
     memory_db->addImage(post_id, signature);
 
-    json data = {
+    nlohmann::json data = {
       { "post_id", post_id },
       { "hash", signature.to_string() },
       { "signature", {
@@ -115,24 +130,19 @@ void http_server(const std::string host, const int port, const std::string datab
   server.Post("/query", [&](const auto &request, auto &response) {
     std::shared_lock lock(mutex_);
 
+    const auto json = json::parse(request.body);
+    if(!json.is_object() || !json.contains("channels") || !channel_param_valid(json["channels"])) {
+      throw param_error("`POST /query` must be { 'channels': { 'r': [], 'g': [], 'b': [] }} with 128^2 entries each");
+    }
     int limit = 10;
-    sim_vector matches;
-    json data = json::array();
-
-    if (request.has_param("limit"))
-      limit = stoi(request.get_param_value("limit"));
-
-    if (request.has_param("hash")) {
-      const auto hash = request.get_param_value("hash");
-      HaarSignature haar = HaarSignature::from_hash(hash);
-      matches = memory_db->queryFromSignature(haar, limit);
-    } else if (request.has_file("file")) {
-      const auto &file = request.get_file_value("file");
-      matches = memory_db->queryFromBlob(file.content, limit);
-    } else {
-      throw param_error("`POST /query` requires a `file` or `hash` param");
+    if (json.contains("limit") && json["limit"].is_number_integer()) {
+      limit = json["limit"];
     }
 
+    const auto channels = json["channels"];
+    sim_vector matches = memory_db->queryFromChannels(channels["r"], channels["g"], channels["b"], limit);
+
+    nlohmann::json data = json::array();
     for (const auto &match : matches) {
       auto image = memory_db->getImage(match.id);
       auto haar = image->haar();

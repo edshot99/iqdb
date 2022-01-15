@@ -9,7 +9,6 @@ target_link_libraries(
   fmt::fmt
   sqlite_orm::sqlite_orm
   ${CMAKE_DL_LIBS} # libdl (for dlsym)
-  ${GDLIB_LIBRARIES}
 )
 
 # https://cmake.org/cmake/help/latest/command/target_include_directories.html
@@ -18,7 +17,7 @@ target_include_directories(iqdb PUBLIC ../include)
 # Treat these headers as system headers (using -isystem instead of -I), so they
 # don't trigger compiler warnings.
 # https://gcc.gnu.org/onlinedocs/cpp/System-Headers.html
-target_include_directories(iqdb SYSTEM PRIVATE ${HTTPLIB_INCLUDE_DIR} ${GDLIB_INCLUDE_DIRS})
+target_include_directories(iqdb SYSTEM PRIVATE ${HTTPLIB_INCLUDE_DIR})
 
 set(IQDB_DEBUG_CFLAGS
   # https://gcc.gnu.org/onlinedocs/gcc/Debugging-Options.html
@@ -76,6 +75,5 @@ set(IQDB_RELEASE_CFLAGS
 
 target_compile_options(iqdb PRIVATE $<$<CONFIG:DEBUG>:${IQDB_DEBUG_CFLAGS}>)
 target_compile_options(iqdb PRIVATE $<$<CONFIG:RELEASE>:${IQDB_RELEASE_CFLAGS}>)
-target_compile_options(iqdb PRIVATE ${GDLIB_CFLAGS_OTHER})
 
 target_link_options(iqdb PRIVATE $<$<CONFIG:DEBUG>:${IQDB_DEBUG_LDFLAGS}>)

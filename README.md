@@ -1,12 +1,10 @@
-[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/from-referrer/)
-
-# IQDB: Image Query Database System
+s# IQDB: Image Query Database System
 
 IQDB is a reverse image search system. It lets you search a database of images
 to find images that are visually similar to a given image.
 
 This version of IQDB is a fork of the original IQDB used by https://iqdb.org.
-This version powers the reverse image search for [Danbooru](https://github.com/danbooru/danbooru).
+This version powers the reverse image search for [E621](https://github.com/zwagoth/e621ng).
 
 # Quickstart
 
@@ -24,11 +22,6 @@ curl -F file=@test.jpg http://localhost:5588/images/1234
 curl -F file=@test.jpg http://localhost:5588/query
 ```
 
-Click the Gitpod badge above to open a demo instance of IQDB in
-[Gitpod](https://gitpod.io/). This will open a web-based VS Code environment
-where you can open a new terminal and run the curl commands above to try out
-IQDB.
-
 # Usage
 
 IQDB is a simple HTTP server with a JSON API. It has commands for adding
@@ -38,7 +31,7 @@ stored on disk in an SQLite database.
 #### Adding images
 
 To add an image to the database, POST a file to `/images/:id` where `:id` is an
-ID number for the image. On Danbooru, the IDs used are post IDs, but they can
+ID number for the image. On e621, the IDs used are post IDs, but they can
 be any number to identify the image.
 
 ```bash
@@ -110,7 +103,6 @@ IQDB requires the following dependencies to build:
 
 * A C++ compiler
 * [CMake 3.19+](https://cmake.org/install/)
-* [LibGD](https://libgd.github.io/)
 * [SQLite](https://www.sqlite.org/download.html)
 * [Python 3](https://www.python.org/downloads)
 * [Git](https://git-scm.com/downloads)
@@ -124,7 +116,7 @@ You can also run `cmake --preset release` then `cmake --build --preset release
 
 You can run `make docker` to build the docker image.
 
-See the [Dockerfile](./Dockerfile) for an example of which packages to install on Ubuntu.
+See the [Dockerfile](./Dockerfile) for an example of which packages to install.
 
 # History
 

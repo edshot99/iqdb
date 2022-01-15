@@ -70,6 +70,5 @@ FetchContent_MakeAvailable(sqliteOrm)
 find_package(SQLite3 REQUIRED)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GDLIB REQUIRED gdlib)
 
 add_subdirectory(src)

@@ -5,7 +5,6 @@
 #include <iqdb/haar_signature.h>
 #include <iqdb/haar.h>
 #include <iqdb/imgdb.h>
-#include <iqdb/resizer.h>
 
 namespace iqdb {
 
@@ -18,47 +17,8 @@ HaarSignature::HaarSignature(lumin_t avglf_, signature_t sig_) {
   std::sort(&sig[2][0], &sig[2][NUM_COEFS]);
 }
 
-HaarSignature HaarSignature::from_hash(const std::string hash) {
-  if (hash.size() != 5 + 2*sizeof(HaarSignature)) {
-    throw param_error("Invalid hash (hash=" + hash + ")");
-  }
-
-  HaarSignature haar;
-  const char* p = hash.c_str() + 5; // skip "iqdb_" prefix
-
-  for (double& avglf : haar.avglf) {
-    sscanf(p, "%16lx", reinterpret_cast<uint64_t*>(&avglf));
-    p += 2 * sizeof(uint64_t);
-  }
-
-  for (int c = 0; c < 3; c++) {
-    for (int16_t& coef : haar.sig[c]) {
-      sscanf(p, "%4hx", reinterpret_cast<uint16_t*>(&coef));
-      p += 2 * sizeof(int16_t);
-    }
-  }
-
-  return haar;
-}
-
-HaarSignature HaarSignature::from_file_content(const std::string blob) {
+HaarSignature HaarSignature::from_channels(std::vector<unsigned char> rchan, std::vector<unsigned char> gchan, std::vector<unsigned char> bchan) {
   HaarSignature signature;
-  std::vector<unsigned char> rchan(NUM_PIXELS * NUM_PIXELS);
-  std::vector<unsigned char> gchan(NUM_PIXELS * NUM_PIXELS);
-  std::vector<unsigned char> bchan(NUM_PIXELS * NUM_PIXELS);
-
-  auto image = resize_image_data((const unsigned char *)blob.data(), blob.size(), NUM_PIXELS, NUM_PIXELS);
-
-  for (int y = 0; y < NUM_PIXELS; y++) {
-    for (int x = 0; x < NUM_PIXELS; x++) {
-      // https://libgd.github.io/manuals/2.3.1/files/gd-c.html#gdImageGetPixel
-      // https://libgd.github.io/manuals/2.3.1/files/gd-h.html#gdTrueColorGetRed
-      int pixel = gdImageGetPixel(image.get(), x, y);
-      rchan[x + y * NUM_PIXELS] = static_cast<unsigned char>(gdTrueColorGetRed(pixel));
-      gchan[x + y * NUM_PIXELS] = static_cast<unsigned char>(gdTrueColorGetGreen(pixel));
-      bchan[x + y * NUM_PIXELS] = static_cast<unsigned char>(gdTrueColorGetBlue(pixel));
-    }
-  }
 
   std::vector<Unit> cdata1(NUM_PIXELS * NUM_PIXELS);
   std::vector<Unit> cdata2(NUM_PIXELS * NUM_PIXELS);
