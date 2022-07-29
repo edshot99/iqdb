@@ -5,7 +5,7 @@
 
 namespace iqdb {
 
-// The logging verbosity level. 0 = DEBUG, 1 = ERROR, 2 = WARN, 3 = INFO.
+// The logging verbosity level. 0 = DEBUG, 1 = INFO, 2 = WARN, 3 = ERROR.
 extern int debug_level;
 
 template<typename... Args>
@@ -21,8 +21,8 @@ inline void DEBUG(std::string format, Args... args) {
 }
 
 template<typename... Args>
-inline void ERROR(std::string format, Args... args) {
-  LOG("[error] " + format, 1, args...);
+inline void INFO(std::string format, Args... args) {
+  LOG("[info] " + format, 1, args...);
 }
 
 template<typename... Args>
@@ -31,8 +31,8 @@ inline void WARN(std::string format, Args... args) {
 }
 
 template<typename... Args>
-inline void INFO(std::string format, Args... args) {
-  LOG("[info] " + format, 3, args...);
+inline void ERROR(std::string format, Args... args) {
+  LOG("[error] " + format, 3, args...);
 }
 
 }

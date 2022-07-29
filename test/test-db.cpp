@@ -177,7 +177,7 @@ int main() {
   imgdb::dbSpace::imgDataFromBlob(image.data(), image.size() - 1, 0, &org);
   fprintf(stderr, "test.jpg avgl: %f %f %f\n", org.avglf[0], org.avglf[1], org.avglf[2]);
   if (!org.avglf[0] || !org.avglf[1] || !org.avglf[2]) {
-    DEBUG("Image loading failed!\n");
+    ERROR("Image loading failed!\n");
     exit(1);
   }
   unlink(fn);

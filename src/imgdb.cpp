@@ -195,7 +195,7 @@ void IQDB::removeImage(imageId post_id) {
   m_info.at(image->id).avgl.v[0] = 0;
   sqlite_db_->removeImage(post_id);
 
-  DEBUG("Removed post #{} from memory and database.\n", post_id);
+  INFO("Removed post #{} from memory and database.\n", post_id);
 }
 
 size_t IQDB::getImgCount() {

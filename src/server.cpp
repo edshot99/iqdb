@@ -186,7 +186,7 @@ void http_server(const std::string host, const int port, const std::string datab
       { "message", message }
     };
 
-    DEBUG("Exception: {}\n", message);
+    ERROR("Exception: {}\n", message);
 
     res.set_content(data.dump(4), "application/json");
     res.status = 500;
