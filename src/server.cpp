@@ -123,16 +123,22 @@ void http_server(const std::string host, const int port, const std::string datab
     response.set_content(data.dump(4), "application/json");
   });
 
-    server.Get("/images/(\\d+)", [&](const auto &request, auto &response) {
+  server.Get("/images/(\\d+)", [&](const auto &request, auto &response) {
     std::unique_lock lock(mutex_);
 
     const postId post_id = std::stoi(request.matches[1]);
     auto image = memory_db->getImage(post_id);
-    json data = {
-      { "post_id", post_id },
-      { "hash", image->haar().to_string() }
-    };
 
+    json data;
+    if (image == std::nullopt) {
+      data = { "message", "Not found" };
+      response.status = 404;
+    } else {
+      data = {
+        { "post_id", post_id },
+        { "hash", image->haar().to_string() }
+      };
+    }
     response.set_content(data.dump(4), "application/json");
   });
 
