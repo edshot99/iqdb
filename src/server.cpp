@@ -131,7 +131,9 @@ void http_server(const std::string host, const int port, const std::string datab
 
     json data;
     if (image == std::nullopt) {
-      data = { "message", "Not found" };
+      data = {
+        { "message", "Not found" }
+      };
       response.status = 404;
     } else {
       data = {
