@@ -19,7 +19,6 @@ struct HaarSignature {
   static HaarSignature from_channels(const std::vector<unsigned char> rchan, const std::vector<unsigned char> gchan, const std::vector<unsigned char> bchan);
 
   std::string to_string() const;
-  std::string to_json() const;
   bool is_grayscale() const noexcept;
   int num_colors() const noexcept;
 };

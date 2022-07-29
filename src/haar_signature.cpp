@@ -34,8 +34,8 @@ HaarSignature HaarSignature::from_channels(std::vector<unsigned char> rchan, std
 }
 
 std::string HaarSignature::to_string() const {
-  std::string str = "iqdb_";
-  str.reserve(5 + sizeof(HaarSignature)*2);
+  std::string str = "";
+  str.reserve(sizeof(HaarSignature)*2);
 
   str += fmt::format("{:016x}", reinterpret_cast<const uint64_t&>(avglf[0]));
   str += fmt::format("{:016x}", reinterpret_cast<const uint64_t&>(avglf[1]));
@@ -48,13 +48,6 @@ std::string HaarSignature::to_string() const {
   }
 
   return str;
-}
-
-std::string HaarSignature::to_json() const {
-  return nlohmann::json({
-    { "avglf", avglf },
-    { "sig", sig },
-  }).dump();
 }
 
 bool HaarSignature::is_grayscale() const noexcept {

@@ -122,7 +122,7 @@ sim_vector IQDB::queryFromSignature(const HaarSignature &signature, size_t numre
   std::priority_queue<sim_value> pqResults; /* results priority queue; largest at top */
   sim_vector V; /* output results */
 
-  DEBUG("Querying signature={} json={}\n", signature.to_string(), signature.to_json());
+  DEBUG("Querying signature={}\n", signature.to_string());
 
   // Luminance score (DC coefficient).
   for (size_t i = 0; i < scores.size(); i++) {

@@ -105,10 +105,6 @@ void http_server(const std::string host, const int port, const std::string datab
     nlohmann::json data = {
       { "post_id", post_id },
       { "hash", signature.to_string() },
-      { "signature", {
-        { "avglf", signature.avglf },
-        { "sig", signature.sig },
-      }}
     };
 
     response.set_content(data.dump(4), "application/json");
@@ -122,6 +118,19 @@ void http_server(const std::string host, const int port, const std::string datab
 
     json data = {
       { "post_id", post_id },
+    };
+
+    response.set_content(data.dump(4), "application/json");
+  });
+
+    server.Get("/images/(\\d+)", [&](const auto &request, auto &response) {
+    std::unique_lock lock(mutex_);
+
+    const postId post_id = std::stoi(request.matches[1]);
+    auto image = memory_db->getImage(post_id);
+    json data = {
+      { "post_id", post_id },
+      { "hash", image->haar().to_string() }
     };
 
     response.set_content(data.dump(4), "application/json");
@@ -151,10 +160,6 @@ void http_server(const std::string host, const int port, const std::string datab
         { "post_id", match.id },
         { "score", match.score },
         { "hash", haar.to_string() },
-        { "signature", {
-          { "avglf", haar.avglf },
-          { "sig", haar.sig },
-        }}
       };
     }
 
