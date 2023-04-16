@@ -152,14 +152,23 @@ void http_server(const std::string host, const int port, const std::string datab
     std::shared_lock lock(mutex_);
 
     const auto json = json::parse(request.body);
-    validate_json_is_valid(json);
     int limit = 10;
     if (json.contains("limit") && json["limit"].is_number_integer()) {
       limit = json["limit"];
     }
 
-    const auto channels = json["channels"];
-    sim_vector matches = memory_db->queryFromChannels(channels["r"], channels["g"], channels["b"], limit);
+    sim_vector matches;
+    if (request.has_param("hash")) {
+      const auto hash = request.get_param_value("hash");
+      HaarSignature haar = HaarSignature::from_hash(hash);
+      matches = memory_db->queryFromSignature(haar, limit);
+    } else if (request.has_param("channels")) {
+      validate_json_is_valid(json);
+      const auto channels = json["channels"];
+      matches = memory_db->queryFromChannels(channels["r"], channels["g"], channels["b"], limit);
+    } else {
+      throw param_error("POST /query requires either `hash` or `channels` param");
+    }
 
     nlohmann::json data = json::array();
     for (const auto &match : matches) {
