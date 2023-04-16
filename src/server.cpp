@@ -158,11 +158,10 @@ void http_server(const std::string host, const int port, const std::string datab
     }
 
     sim_vector matches;
-    if (request.has_param("hash")) {
-      const auto hash = request.get_param_value("hash");
-      HaarSignature haar = HaarSignature::from_hash(hash);
+    if (json.contains("hash")) {
+      HaarSignature haar = HaarSignature::from_hash(json["hash"]);
       matches = memory_db->queryFromSignature(haar, limit);
-    } else if (request.has_param("channels")) {
+    } else if (json.contains("channels")) {
       validate_json_is_valid(json);
       const auto channels = json["channels"];
       matches = memory_db->queryFromChannels(channels["r"], channels["g"], channels["b"], limit);
