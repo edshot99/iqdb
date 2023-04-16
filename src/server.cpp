@@ -82,6 +82,12 @@ bool channel_param_valid(nlohmann::json json) {
   return false;
 }
 
+void validate_json_is_valid(nlohmann::json json) {
+  if(!json.is_object() || !json.contains("channels") || !channel_param_valid(json["channels"])) {
+    throw param_error("`POST /images` must be { 'channels': { 'r': [], 'g': [], 'b': [] }} 128^2 entries each");
+  }
+}
+
 void http_server(const std::string host, const int port, const std::string database_filename) {
   INFO("Starting server...\n");
 
@@ -95,9 +101,7 @@ void http_server(const std::string host, const int port, const std::string datab
 
     const postId post_id = std::stoi(request.matches[1]);
     const auto json = json::parse(request.body);
-    if(!json.is_object() || !json.contains("channels") || !channel_param_valid(json["channels"])) {
-      throw param_error("`POST /images` must be { 'channels': { 'r': [], 'g': [], 'b': [] }} 128^2 entries each");
-    }
+    validate_json_is_valid(json);
     const auto channels = json["channels"];
     const auto signature = HaarSignature::from_channels(channels["r"], channels["g"], channels["b"]);
     memory_db->addImage(post_id, signature);
@@ -148,9 +152,7 @@ void http_server(const std::string host, const int port, const std::string datab
     std::shared_lock lock(mutex_);
 
     const auto json = json::parse(request.body);
-    if(!json.is_object() || !json.contains("channels") || !channel_param_valid(json["channels"])) {
-      throw param_error("`POST /query` must be { 'channels': { 'r': [], 'g': [], 'b': [] }} with 128^2 entries each");
-    }
+    validate_json_is_valid(json);
     int limit = 10;
     if (json.contains("limit") && json["limit"].is_number_integer()) {
       limit = json["limit"];
