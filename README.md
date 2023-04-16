@@ -4,7 +4,7 @@ IQDB is a reverse image search system. It lets you search a database of images
 to find images that are visually similar to a given image.
 
 This version of IQDB is a fork of the original IQDB used by https://iqdb.org.
-This version powers the reverse image search for [E621](https://github.com/zwagoth/e621ng).
+This version powers the reverse image search for [E621](https://github.com/e621ng/e621ng).
 
 # Quickstart
 
@@ -96,7 +96,6 @@ IQDB requires the following dependencies to build:
 * A C++ compiler
 * [CMake 3.19+](https://cmake.org/install/)
 * [SQLite](https://www.sqlite.org/download.html)
-* [Python 3](https://www.python.org/downloads)
 * [Git](https://git-scm.com/downloads)
 
 Run `make` to compile the project. The binary will be at `./build/release/src/iqdb`.
@@ -112,7 +111,9 @@ See the [Dockerfile](./Dockerfile) for an example of which packages to install.
 
 # History
 
-This version of IQDB is a fork of the original [IQDB](https://iqdb.org/code),
+This version of IQDB is a fork of the [Danbooru IQDB](https://github.com/danbooru/iqdb)
+with improvements from [evazion](https://github.com/danbooru/iqdb)
+which is in turn a fork of the [original IQDB](https://iqdb.org/code),
 written by [piespy](mailto:piespy@gmail.com). IQDB is based on code from
 [imgSeek](https://sourceforge.net/projects/imgseek/), written by Ricardo
 Niederberger Cabral. The IQDB algorithm is based on the paper
