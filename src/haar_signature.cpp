@@ -1,7 +1,6 @@
 #include <vector>
 
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 #include <iqdb/haar_signature.h>
 #include <iqdb/haar.h>
 #include <iqdb/imgdb.h>

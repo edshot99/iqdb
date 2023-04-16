@@ -20,45 +20,36 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # https://stackoverflow.com/questions/1620918/cmake-and-libpthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
-# Compile httplib instead of using header-only version.
-# https://github.com/yhirose/cpp-httplib/blob/master/CMakeLists.txt
-set(HTTPLIB_COMPILE ON)
-
-# Compile json library instead of using header-only version.
-# https://github.com/nlohmann/json/blob/develop/CMakeLists.txt#L35
-# https://github.com/nlohmann/json#integration
-set(JSON_MultipleHeaders ON)
-
 include(FetchContent)
 
 FetchContent_Declare(
   httplib
   GIT_REPOSITORY https://github.com/yhirose/cpp-httplib
-  GIT_TAG        v0.8.9
+  GIT_TAG        v0.12.2
 )
 
 FetchContent_Declare(
   json
   GIT_REPOSITORY https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent
-  GIT_TAG v3.9.1
+  GIT_TAG        v3.11.2
 )
 
 FetchContent_Declare(
   Catch2
   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG        v2.13.6
+  GIT_TAG        v3.3.2
 )
 
 FetchContent_Declare(
   fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt
-  GIT_TAG        7.1.3
+  GIT_TAG        9.1.0
 )
 
 FetchContent_Declare(
   sqliteOrm
   GIT_REPOSITORY https://github.com/fnc12/sqlite_orm
-  GIT_TAG        1.6
+  GIT_TAG        v1.8.2
 )
 
 FetchContent_MakeAvailable(httplib)

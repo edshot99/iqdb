@@ -187,14 +187,25 @@ void http_server(const std::string host, const int port, const std::string datab
     INFO("{} \"{} {} {}\" {} {}\n", req.remote_addr, req.method, req.path, req.version, res.status, res.body.size());
   });
 
-  server.set_exception_handler([](const auto& req, auto& res, std::exception &e) {
-    const auto message = e.what();
+  server.set_exception_handler([](const auto& req, auto& res, std::exception_ptr ep) {
+    json data;
+    try {
+      std::rethrow_exception(ep);
+    } catch (std::exception &e) {
+      const auto message = e.what();
 
-    json data = {
-      { "message", message }
-    };
+      data = {
+        { "message", message }
+      };
 
-    ERROR("Exception: {}\n", message);
+      ERROR("Exception: {}\n", message);
+
+    } catch (...) {
+      data = {
+        { "message", "Unknown exception" }
+      };
+      ERROR("Exception: {}\n", "Unknown exception");
+    }
 
     res.set_content(data.dump(4), "application/json");
     res.status = 500;
