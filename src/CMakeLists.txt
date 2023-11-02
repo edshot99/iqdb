@@ -66,12 +66,15 @@ set(IQDB_DEBUG_CFLAGS
 # -fsanitize needs to be passed to both the compiler and the linker
 set(IQDB_DEBUG_LDFLAGS -fsanitize=undefined -fsanitize=leak -fsanitize=address)
 
-set(IQDB_RELEASE_CFLAGS
-  # https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
-  # https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
-  # https://funroll-loops.oya.to/
-  -Wall -O3 -g3 -pipe -DNDEBUG -flto -fno-strict-aliasing -march=native
-)
+# https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
+# https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
+# https://gcc.gnu.org/onlinedocs/gcc/ARM-Options.html
+# https://funroll-loops.oya.to/
+if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
+  set(IQDB_DOCKER_CFLAGS -Wall -O3 -g3 -pipe -DNDEBUG -flto -fno-strict-aliasing -march=armv8-a)
+else()
+  set(IQDB_DOCKER_CFLAGS -Wall -O3 -g3 -pipe -DNDEBUG -flto -fno-strict-aliasing -march=x86)
+endif()
 
 target_compile_options(iqdb PRIVATE $<$<CONFIG:DEBUG>:${IQDB_DEBUG_CFLAGS}>)
 target_compile_options(iqdb PRIVATE $<$<CONFIG:RELEASE>:${IQDB_RELEASE_CFLAGS}>)
