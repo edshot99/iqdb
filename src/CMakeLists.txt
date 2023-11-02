@@ -70,7 +70,7 @@ set(IQDB_RELEASE_CFLAGS
   # https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
   # https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
   # https://funroll-loops.oya.to/
-  -Wall -O3 -g3 -pipe -DNDEBUG -flto -fno-strict-aliasing -march=x86-64
+  -Wall -O3 -g3 -pipe -DNDEBUG -flto -fno-strict-aliasing -march=native
 )
 
 target_compile_options(iqdb PRIVATE $<$<CONFIG:DEBUG>:${IQDB_DEBUG_CFLAGS}>)
