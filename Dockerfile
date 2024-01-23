@@ -1,4 +1,4 @@
-FROM alpine:3.18 as builder
+FROM alpine:3.19 as builder
 
 RUN apk --no-cache add sqlite-dev cmake git build-base
 
@@ -6,7 +6,7 @@ WORKDIR /iqdb
 COPY . .
 RUN make release
 
-FROM alpine:3.18
+FROM alpine:3.19
 
 RUN apk --no-cache add sqlite-libs binutils
 

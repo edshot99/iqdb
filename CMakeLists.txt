@@ -20,30 +20,32 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # https://stackoverflow.com/questions/1620918/cmake-and-libpthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
+# https://cmake.org/cmake/help/latest/policy/CMP0135.html
+cmake_policy(SET CMP0135 NEW)
+
 include(FetchContent)
 
 FetchContent_Declare(
   httplib
   GIT_REPOSITORY https://github.com/yhirose/cpp-httplib
-  GIT_TAG        v0.14.1
+  GIT_TAG        v0.14.3
 )
 
 FetchContent_Declare(
   json
-  GIT_REPOSITORY https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent
-  GIT_TAG        v3.11.2
+  URL            https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
 )
 
 FetchContent_Declare(
   Catch2
   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG        v3.4.0
+  GIT_TAG        v3.5.2
 )
 
 FetchContent_Declare(
   fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt
-  GIT_TAG        10.1.1
+  GIT_TAG        10.2.1
 )
 
 FetchContent_Declare(
