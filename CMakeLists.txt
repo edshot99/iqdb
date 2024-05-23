@@ -30,7 +30,7 @@ include(FetchContent)
 FetchContent_Declare(
   httplib
   GIT_REPOSITORY https://github.com/yhirose/cpp-httplib
-  GIT_TAG        v0.14.3
+  GIT_TAG        v0.15.3
 )
 
 FetchContent_Declare(
@@ -41,7 +41,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   Catch2
   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG        v3.5.2
+  GIT_TAG        v3.6.0
 )
 
 FetchContent_Declare(
