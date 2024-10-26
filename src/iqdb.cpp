@@ -42,9 +42,9 @@ int main(int argc, char **argv) {
     }
 
     if (!strcasecmp(argv[1], "http")) {
-      const std::string host = argc >= 2 ? argv[2] : "localhost";
-      const int port = argc >= 3 ? std::stoi(argv[3]) : 8000;
-      const std::string filename = argc >= 4 ? argv[4] : "iqdb.db";
+      const std::string host = argc > 2 ? argv[2] : "localhost";
+      const int port = argc > 3 ? std::stoi(argv[3]) : 8000;
+      const std::string filename = argc > 4 ? argv[4] : "iqdb.db";
 
       http_server(host, port, filename);
     } else {
